@@ -261,7 +261,7 @@ split into two triangles. The diagonal alternates in a checkerboard pattern (not
 always the same direction) specifically to avoid a built-in directional bias in
 the discretization:
 
-```python
+```txt
 ////        instead of        ////
 \\\\                          ////
 ////                          ////
@@ -329,7 +329,7 @@ conductor boundary's own node classification dominates the error (§8.3).
 
 ### 5.1 Module Layout
 
-```python
+```txt
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
                      Circle / Rectangle / OutsideCircle
