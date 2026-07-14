@@ -498,7 +498,7 @@ and the two behave characteristically differently:
 convergence toward the analytical value as $h$ shrinks:
 
 | $h$ (mm) | nodes | $C$ (pF/m) | error |
-|---:|---:|---:|---:|
+| -------: | ----: | ---------: | ----: |
 
 | 0.300 | 12,996 | 77.311 | −2.76% |
 | 0.200 | 29,241 | 77.813 | −2.12% |
@@ -509,12 +509,12 @@ convergence toward the analytical value as $h$ shrinks:
 **Parallel plate** (sharp conductor corner) — the same solver, same
 convergence-testing code, deliberately *not* forced to look clean:
 
-| $h$ (mm) | nodes | $C$ (pF/m) | change |
-|---:|---:|---:|---:|
-| 0.400 | 12,467 | 88.805 | — |
-| 0.200 | 49,051 | 93.909 | +5.75% |
-| 0.150 | 87,362 | 93.045 | −0.92% |
-| 0.100 | 195,301 | 97.657 | +4.96% |
+| $h$ (mm) |   nodes | $C$ (pF/m) | change |
+| -------: | ------: | ---------: | -----: |
+|    0.400 |  12,467 |     88.805 |      — |
+|    0.200 |  49,051 |     93.909 | +5.75% |
+|    0.150 |  87,362 |     93.045 | −0.92% |
+|    0.100 | 195,301 |     97.657 | +4.96% |
 
 This second sequence is **not monotonic** (confirmed programmatically at
 runtime by `_describe_convergence`, not asserted in a comment) — it changes
@@ -641,7 +641,7 @@ dependencies, implementation complexity):
   described there. It does *not* address §10.1, since a graded Cartesian grid
   still cannot conform to a curved boundary; only an unstructured mesh does that.
   The cost is implementing and validating a grading scheme correctly (a real,
-  bounded piece of engineering, not a config toggle).
+  bounded piece of engineering, not a config toggle, the idea has already been discarded)
 
 - **Boundary-represented conductors.** Mesh only the dielectric region and apply
   the Dirichlet condition on the boundary contour of a hole, instead of filling
