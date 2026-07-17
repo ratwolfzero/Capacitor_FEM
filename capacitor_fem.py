@@ -97,6 +97,7 @@ class CoaxConfig:
     domain_half_width: float = 17e-3      # simulation domain extends to +/- this
     voltage: float = 100.0
     dielectric_eps_r: float = 2.3          # e.g. polyethylene, a common coax dielectric
+    background_eps_r: float = 1.0          # only matters outside the dielectric fill radius
     mesh_spacing: float = 0.075e-3
     convergence_spacings: tuple = (0.3e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.075e-3)
 
@@ -929,7 +930,7 @@ def _solve_coax(config, h):
     dielectric = Material("dielectric_fill", eps_r=config.dielectric_eps_r)
     fill = Circle((0, 0), config.outer_radius, eps_r=dielectric.eps_r,
                   name="dielectric_fill")
-    eps_r_of_xy = make_eps_r_function([fill], background_eps_r=1.0)
+    eps_r_of_xy = make_eps_r_function([fill], background_eps_r=config.background_eps_r)
 
     half = config.domain_half_width
     mesh = Mesh(-half, -half, 2 * half, 2 * half, nx=nx, ny=ny)
