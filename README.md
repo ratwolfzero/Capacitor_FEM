@@ -261,7 +261,7 @@ split into two triangles. The diagonal alternates in a checkerboard pattern (not
 always the same direction) specifically to avoid a built-in directional bias in
 the discretization:
 
-```
+```text
 ////        instead of        ////
 \\\\                          ////
 ////                          ////
@@ -329,7 +329,7 @@ conductor boundary's own node classification dominates the error (§8.3).
 
 ### 5.1 Module Layout
 
-```
+```text
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
                      Circle / Rectangle / OutsideCircle
@@ -519,23 +519,23 @@ and the two behave characteristically differently:
 **Coaxial cable** (smooth circular boundary, no sharp corner) — clean, monotonic
 convergence toward the analytical value as $h$ shrinks:
 
-| $h$ (mm) | nodes | $C$ (pF/m) | error |
-|---:|---:|---:|---:|
-| 0.300 | 12,996 | 77.311 | −2.76% |
-| 0.200 | 29,241 | 77.813 | −2.12% |
-| 0.150 | 51,984 | 78.495 | −1.27% |
-| 0.100 | 116,281 | 78.593 | −1.14% |
-| 0.075 | 206,116 | 78.910 | −0.75% |
+| $h$ (mm) |   nodes | $C$ (pF/m) |  error |
+| -------: | ------: | ---------: | -----: |
+|    0.300 |  12,996 |     77.311 | −2.76% |
+|    0.200 |  29,241 |     77.813 | −2.12% |
+|    0.150 |  51,984 |     78.495 | −1.27% |
+|    0.100 | 116,281 |     78.593 | −1.14% |
+|    0.075 | 206,116 |     78.910 | −0.75% |
 
 **Parallel plate** (sharp conductor corner) — the same solver, same
 convergence-testing code, deliberately *not* forced to look clean:
 
-| $h$ (mm) | nodes | $C$ (pF/m) | change |
-|---:|---:|---:|---:|
-| 0.400 | 12,467 | 88.805 | — |
-| 0.200 | 49,051 | 93.909 | +5.75% |
-| 0.150 | 87,362 | 93.045 | −0.92% |
-| 0.100 | 195,301 | 97.657 | +4.96% |
+| $h$ (mm) |   nodes | $C$ (pF/m) | change |
+| -------: | ------: | ---------: | -----: |
+|    0.400 |  12,467 |     88.805 |      — |
+|    0.200 |  49,051 |     93.909 | +5.75% |
+|    0.150 |  87,362 |     93.045 | −0.92% |
+|    0.100 | 195,301 |     97.657 | +4.96% |
 
 This second sequence is **not monotonic** (confirmed programmatically at
 runtime by `_describe_convergence`, not asserted in a comment) — it changes
