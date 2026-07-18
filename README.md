@@ -359,24 +359,19 @@ guarantee — actual memory depends on the machine, BLAS/LAPACK build, and
 problem specifics.
 
 The available levers, roughly in order of effort: use a coarser `mesh_spacing`
-(the immediate fix); exploit the matrix's symmetry with a solver that's aware of
-it (e.g. a Cholesky-based factorization via `scikit-sparse`/`CHOLMOD`), which
-this project doesn't do by default since it would add a native dependency for
-exactly the same reason `gmsh` isn't included (§1); switch to an iterative
-solver (e.g. conjugate gradient, valid since the matrix is SPD), which has much
-better memory scaling but trades the current solver's simplicity and
-determinism for a convergence tolerance that needs choosing and, without a
-decent preconditioner, can converge slowly or unpredictably on this kind of
-problem — a real trade-off, not a strict improvement; or, most fundamentally, an
-unstructured/graded mesh (§11) that only spends nodes where the field actually
-needs them, so the same local resolution near a feature costs far fewer nodes
-overall.
+(the immediate fix, no code change needed); a solver that exploits the matrix's
+symmetry, or an iterative solver instead of a direct one, both of which leave
+the mesh untouched; or, most fundamentally, an unstructured/graded mesh that
+only spends nodes where the field actually needs them. See §11 for what each of
+these three actually costs and trades off — the mesh option is the same one
+discussed throughout §10, the other two are new, solver-level alternatives
+unrelated to mesh choice.
 
 ## 5. Software Architecture
 
 ### 5.1 Module Layout
 
-```text
+```txt
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
                      Circle / Rectangle / OutsideCircle
@@ -813,3 +808,26 @@ dependencies, implementation complexity):
 
 - **3D / tetrahedral elements**: the same weak form and the same assembly
   pattern, with 4-node tetrahedral shape functions in place of 3-node triangles.
+
+Everything above is ordered by how much of §10 (accuracy) it addresses. The
+two items below are a different axis entirely — memory and runtime (§4.6) —
+and don't change accuracy at all:
+
+- **Symmetry-aware direct solver.** `apply_conductors_and_solve` uses
+  `scipy.sparse.linalg.spsolve`, a general (non-symmetric) sparse LU
+  factorization, even though the stiffness matrix is symmetric positive
+  definite. A Cholesky-based solver aware of that (e.g.
+  `scikit-sparse`/`CHOLMOD`) does roughly half the factorization work and needs
+  less memory for the same mesh — no change to node count or accuracy, purely a
+  linear-algebra efficiency gain. Not included by default for the same reason
+  `gmsh` isn't: it's a new native dependency.
+
+- **Iterative solver.** Since the matrix is SPD, conjugate gradient is a valid
+  alternative to a direct solve, with memory that scales with problem size
+  directly rather than the superlinear growth measured in §4.6 (no
+  factorization fill-in). A real trade-off, not a strict improvement: unlike
+  the current one-shot, exact direct solve, CG needs a convergence tolerance
+  and, without a decent preconditioner, can converge slowly or unpredictably on
+  this kind of problem — swapping it in naively could trade a clear memory
+  error for a worse failure mode (a run that never finishes, with no clear
+  signal why).
