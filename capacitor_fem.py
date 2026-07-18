@@ -75,7 +75,7 @@ class ParallelPlateConfig:
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5         # e.g. glass
     background_eps_r: float = 1.0         # e.g. air
-    mesh_spacing: float = 0.03e-3           # production grid spacing h
+    mesh_spacing: float = 0.1e-3           # production grid spacing h
 
     # The field default below is the exact literal tuple this project has
     # validated and published results against -- not derived from
