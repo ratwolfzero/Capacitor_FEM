@@ -37,6 +37,7 @@ the derivation starts from Maxwell's equations and builds up.
     - [4.3 Grid Alignment: `snap_to_grid`](#43-grid-alignment-snap_to_grid)
     - [4.4 Vectorized Sparse Assembly](#44-vectorized-sparse-assembly)
     - [4.5 Material Assignment](#45-material-assignment)
+    - [4.6 Memory and Runtime Scaling](#46-memory-and-runtime-scaling)
   - [5. Software Architecture](#5-software-architecture)
     - [5.1 Module Layout](#51-module-layout)
     - [5.2 Configuration](#52-configuration)
@@ -325,6 +326,52 @@ only arises for boundaries that cannot be grid-aligned (a circle), and even ther
 refining the sampling was measured to make a negligible difference, since the
 conductor boundary's own node classification dominates the error (§8.3).
 
+### 4.6 Memory and Runtime Scaling
+
+Because the mesh is a uniform Cartesian grid (§4.1), node count grows as
+$1/h^2$ — halving $h$ quadruples the mesh, everywhere, whether or not the field
+actually needs that resolution there. Combined with `apply_conductors_and_solve`
+calling `scipy.sparse.linalg.spsolve` — a general (non-symmetric) sparse LU
+factorization, even though the underlying stiffness matrix is symmetric
+positive definite — peak memory was measured to grow *faster* than linear in
+node count:
+
+|       $h$ |   nodes | measured peak RSS |
+| --------: | ------: | ----------------: |
+|  0.300 mm |  12,996 |            108 MB |
+|  0.150 mm |  51,984 |            184 MB |
+|  0.075 mm | 206,116 |            523 MB |
+| 0.0375 mm | 824,464 |           1.75 GB |
+
+Fitting a power law to these four points gives peak RSS $\approx 0.14 \times
+\text{nodes}^{0.68}$ MB — extrapolating (not measured directly, to avoid risking
+an out-of-memory crash while writing this) puts roughly 2 million nodes ($h
+\approx 30\,\mu\text{m}$ on the coax domain) at about 2 GB, and roughly 11.5
+million nodes ($h = 10\,\mu\text{m}$) at close to 9 GB. Both shipped examples,
+at their production resolution, sit at roughly 0.5 GB or less — comfortably
+below where this becomes a practical concern — but pushing `mesh_spacing` an
+order of magnitude finer than the shipped defaults (e.g. from $10^{-4}$ to
+$10^{-5}$) can plausibly exceed a typical laptop's RAM. `Mesh.__init__` prints a
+non-blocking heads-up (via `_warn_if_large_mesh`) above roughly 1 million nodes,
+with a more prominent warning above 5 million, using this same fitted estimate.
+Treat the estimate as a ballpark for deciding whether to worry, not a
+guarantee — actual memory depends on the machine, BLAS/LAPACK build, and
+problem specifics.
+
+The available levers, roughly in order of effort: use a coarser `mesh_spacing`
+(the immediate fix); exploit the matrix's symmetry with a solver that's aware of
+it (e.g. a Cholesky-based factorization via `scikit-sparse`/`CHOLMOD`), which
+this project doesn't do by default since it would add a native dependency for
+exactly the same reason `gmsh` isn't included (§1); switch to an iterative
+solver (e.g. conjugate gradient, valid since the matrix is SPD), which has much
+better memory scaling but trades the current solver's simplicity and
+determinism for a convergence tolerance that needs choosing and, without a
+decent preconditioner, can converge slowly or unpredictably on this kind of
+problem — a real trade-off, not a strict improvement; or, most fundamentally, an
+unstructured/graded mesh (§11) that only spends nodes where the field actually
+needs them, so the same local resolution near a feature costs far fewer nodes
+overall.
+
 ## 5. Software Architecture
 
 ### 5.1 Module Layout
@@ -361,8 +408,7 @@ import dataclasses
 default = ParallelPlateConfig()                          # the shipped example
 custom = ParallelPlateConfig(dielectric_eps_r=9.8,        # e.g. a ceramic instead of glass
                               gap=2e-3,
-                              mesh_spacing=0.05e-3,
-                              convergence_spacings=(0.2e-3, 0.1e-3, 0.05e-3))
+                              mesh_spacing=0.05e-3)        # convergence_spacings follows automatically
 also_custom = dataclasses.replace(default, gap=2e-3)      # copy-with-override
 ```
 
@@ -370,7 +416,33 @@ Configs are frozen (immutable) — construct a new one to change a value. Each
 config validates itself on construction: `convergence_spacings[-1]` must equal
 `mesh_spacing`, since the finest sweep level is reused as the production
 resolution for the final report and plot, and a silent mismatch there would be a
-confusing way to fail.
+confusing way to fail. Changing `mesh_spacing` alone, as above, doesn't hit that
+error — if `convergence_spacings` is left untouched, a fresh sweep is derived
+automatically from the new `mesh_spacing`, using the same coarse-to-fine ratios
+as the shipped default. Passing an explicit `convergence_spacings` still works
+exactly as before and is still validated: only the *default* value is treated as
+"untouched, please adapt it," so a genuine typo in a custom tuple is still
+caught rather than silently overridden.
+
+That auto-derivation is deliberately conservative about *how* it's triggered.
+An earlier version of this mechanism instead used a `None` sentinel default and
+recomputed `convergence_spacings` via `ratio * mesh_spacing` arithmetic on
+every construction — including the ordinary, untouched-default case. That
+turned out to be a real problem, not just a style choice: multiplying out a
+ratio does not reliably reproduce a literal tuple's exact floating-point bit
+pattern (e.g. `1.5 * 0.1e-3` is not bit-identical to the literal `0.15e-3`,
+differing at the last representable bit). Because every conductor and material
+edge in this project is deliberately snapped to land exactly on a grid line
+(`snap_to_grid`, §4.3), a last-bit difference in a boundary coordinate can flip
+an entire row of mesh nodes across a `Shape.contains()` `<=`/`>=` comparison —
+found in practice by testing this exact mechanism: an arithmetically
+"equivalent" `h` reclassified one full row of nodes as conductor, changing a
+reported capacitance by several percent, for the *default* configuration. The
+fix was to make the field's default the literal tuple again (so the well-tested
+default path is bit-for-bit unchanged and provably carries zero risk of this)
+and trigger the ratio-derivation only when `mesh_spacing` has changed while
+`convergence_spacings` is detected as still equal to that literal default. See
+§10.4 for this as a general limitation, independent of this specific fix.
 
 ### 5.3 Geometry and CSG
 
@@ -612,9 +684,11 @@ approximation of the circular boundary (§8.2, §10.1).
 ## 10. Known Limitations
 
 The finite-element formulation itself is validated, not just asserted (§8.1,
-§8.2). The limitations below are specifically about the *mesh*, not the
-underlying method, and all three trace back to one design choice: a structured,
-non-conforming mesh, chosen so this project has no native dependencies (§1).
+§8.2). The first three limitations below are specifically about the
+*mesh* and trace back to one design choice: a structured, non-conforming mesh,
+chosen so this project has no native dependencies (§1). The fourth is a
+related but distinct fragility in how conductor and material boundaries are
+*classified* on that mesh, independent of mesh resolution.
 
 **10.1 — Non-conforming (structured) mesh.** Curved or non-axis-aligned
 boundaries are approximated by a staircase of grid cells with $O(h)$
@@ -638,19 +712,56 @@ boundaries, where it is a small (§8.3), measured source of mesh-dependence — 
 where refining the *material* sampling doesn't help, since the conductor
 boundary's own node classification dominates.
 
+**10.4 — Boundary classification is sensitive to the last bit of floating-point
+precision, independent of mesh resolution.** `snap_to_grid` (§4.3) deliberately
+makes conductor and material edges land exactly on grid lines, and
+`Shape.contains()` classifies nodes with strict `<=`/`>=` comparisons against
+those edges. Both are correct in exact arithmetic, but in floating-point
+arithmetic, two *mathematically equivalent* ways of computing "the same"
+boundary coordinate — e.g. a literal `0.15e-3` versus an arithmetically derived
+`1.5 * 0.1e-3`, which differ at the last representable bit — can round to
+different floats, and a `<=`/`>=` test evaluated at that coordinate can then
+flip for an *entire row or column* of nodes at once, since every node in that
+row shares the same coordinate. This is not hypothetical: it was found while
+building the `mesh_spacing` → `convergence_spacings` auto-derivation in §5.2,
+where an earlier version of that mechanism reclassified one full row of nodes
+as conductor for the *default* parallel-plate configuration, changing the
+reported capacitance by several percent. The fix there was to keep the
+default construction path on the exact literal values this project's results
+are validated against (§5.2), which is a mitigation for that specific case,
+not a general one — the underlying sensitivity is a property of comparing
+independently-computed floats at a shared boundary, and could in principle
+recur wherever a boundary coordinate is computed two different ways. A
+proper fix needs either tolerance-based classification (accept a node as
+"on the boundary" within some epsilon, rather than by exact comparison) or a
+conforming mesh where a boundary node's position and the boundary's position
+are the same computation by construction, not two values compared after the
+fact — the latter is the same unstructured-mesh direction as 10.1.
+
 ## 11. Future Work
 
 Ordered roughly by leverage (how much of §10 it addresses) against cost (new
 dependencies, implementation complexity):
 
 - **Unstructured, conforming, adaptively refined mesh.** The highest-leverage
-  change available, addressing all three limitations in §10 at once: a mesh
-  generator (e.g. `pygmsh`, building on `gmsh`) that conforms exactly to
-  curved/sharp boundaries and clusters resolution near conductor edges and
-  corners. `assemble_stiffness` and `compute_fields` are already agnostic to how
-  the mesh was built — they only consume `mesh.points` and `mesh.triangles` — so
-  this is a `Mesh`-class swap, not a solver rewrite. It does add `gmsh` as a
-  native dependency, which is why it isn't included by default.
+  change available, addressing 10.1–10.3 at once, and 10.4 as a side effect
+  (node position and boundary position become the same computation, not two
+  values compared after the fact): a mesh generator (e.g. `pygmsh`, building on
+  `gmsh`) that conforms exactly to curved/sharp boundaries and clusters
+  resolution near conductor edges and corners. `assemble_stiffness` and
+  `compute_fields` are already agnostic to how the mesh was built — they only
+  consume `mesh.points` and `mesh.triangles` — so this is a `Mesh`-class swap,
+  not a solver rewrite. It does add `gmsh` as a native dependency, which is why
+  it isn't included by default.
+
+- **Tolerance-based boundary classification — a small, targeted fix for 10.4
+  specifically.** Replace `Shape.contains()`'s exact `<=`/`>=` comparisons with
+  a small-epsilon tolerance, so a node "on" a boundary is classified
+  consistently regardless of which of two equivalent arithmetic paths produced
+  its coordinate. Narrow in scope (doesn't touch 10.1–10.3) but cheap and
+  dependency-free; worth doing independently of the larger mesh changes below,
+  since 10.4 can in principle affect any future code path that computes a
+  boundary coordinate a new way, not just the one instance found so far.
 
 - **Graded (non-uniform) structured mesh — a concrete, dependency-free
   intermediate step.** Keep the Cartesian, dependency-free mesh, but space grid

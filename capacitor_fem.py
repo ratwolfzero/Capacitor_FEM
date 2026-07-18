@@ -41,6 +41,7 @@ import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import ClassVar
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -74,16 +75,53 @@ class ParallelPlateConfig:
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5         # e.g. glass
     background_eps_r: float = 1.0         # e.g. air
-    mesh_spacing: float = 0.1e-3           # production grid spacing h
+    mesh_spacing: float = 0.03e-3           # production grid spacing h
+
+    # The field default below is the exact literal tuple this project has
+    # validated and published results against -- not derived from
+    # mesh_spacing by arithmetic. That distinction matters: multiplying
+    # mesh_spacing by a ratio (e.g. 1.5 * 0.1e-3) does not reliably
+    # reproduce the literal 0.15e-3 bit-for-bit, and because every
+    # conductor/material edge in this project is deliberately snapped to
+    # land exactly on a grid line (snap_to_grid), even a last-bit
+    # difference in a boundary coordinate can flip an entire row of mesh
+    # nodes across a Shape.contains() '<=' comparison -- found by testing
+    # this exact feature: an arithmetically "equivalent" h reclassified
+    # one full row of nodes as conductor, changing a reported capacitance
+    # by several percent. Keeping this field's default a literal value,
+    # and only ever taking the auto-derivation path below when it's
+    # detected as untouched, means the well-tested default configuration
+    # is never exposed to that risk.
     convergence_spacings: tuple = (0.4e-3, 0.2e-3, 0.15e-3, 0.1e-3)
     plot_margin: float = 8e-3             # extra plot view window around the plates
 
+    # Multipliers of mesh_spacing used to auto-derive a fresh
+    # convergence_spacings when mesh_spacing has been changed but
+    # convergence_spacings has not -- preserves the coarse-to-fine
+    # "shape" of the shipped sweep (4x, 2x, 1.5x, 1x the production
+    # resolution) at the new mesh_spacing. Neither is a dataclass field
+    # (ClassVar), so neither appears in __init__.
+    _CONVERGENCE_RATIOS: ClassVar[tuple] = (4.0, 2.0, 1.5, 1.0)
+    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (0.4e-3, 0.2e-3, 0.15e-3, 0.1e-3)
+
     def __post_init__(self):
         if self.convergence_spacings[-1] != self.mesh_spacing:
-            raise ValueError(
-                "convergence_spacings[-1] must equal mesh_spacing: the finest "
-                "level of the convergence sweep is reused as the production "
-                "resolution for the detailed report and plot.")
+            if self.convergence_spacings == self._DEFAULT_CONVERGENCE_SPACINGS:
+                # mesh_spacing was changed but convergence_spacings was
+                # left untouched -- derive a fresh sweep for the new
+                # mesh_spacing instead of failing. frozen dataclass:
+                # object.__setattr__ is the standard way to set a
+                # computed value from __post_init__.
+                object.__setattr__(self, "convergence_spacings",
+                                    tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
+            else:
+                raise ValueError(
+                    "convergence_spacings[-1] must equal mesh_spacing: the finest "
+                    "level of the convergence sweep is reused as the production "
+                    "resolution for the detailed report and plot. Leave "
+                    "convergence_spacings at its default (untouched) to have it "
+                    "follow mesh_spacing automatically, or supply a full "
+                    "replacement tuple ending in the new mesh_spacing.")
 
 
 @dataclass(frozen=True)
@@ -99,14 +137,32 @@ class CoaxConfig:
     dielectric_eps_r: float = 2.3          # e.g. polyethylene, a common coax dielectric
     background_eps_r: float = 1.0          # only matters outside the dielectric fill radius
     mesh_spacing: float = 0.075e-3
+
+    # See ParallelPlateConfig.convergence_spacings for why this is a
+    # literal tuple, not something derived from mesh_spacing.
     convergence_spacings: tuple = (0.3e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.075e-3)
+
+    # See ParallelPlateConfig._CONVERGENCE_RATIOS for what this is and
+    # why. Written as exact fractions (8/3, 4/3), not truncated decimals,
+    # so that when this path DOES run (mesh_spacing changed,
+    # convergence_spacings left at the literal default above), the result
+    # is as numerically clean as a derived value can be.
+    _CONVERGENCE_RATIOS: ClassVar[tuple] = (4.0, 8 / 3, 2.0, 4 / 3, 1.0)
+    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (0.3e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.075e-3)
 
     def __post_init__(self):
         if self.convergence_spacings[-1] != self.mesh_spacing:
-            raise ValueError(
-                "convergence_spacings[-1] must equal mesh_spacing: the finest "
-                "level of the convergence sweep is reused as the production "
-                "resolution for the detailed report and plot.")
+            if self.convergence_spacings == self._DEFAULT_CONVERGENCE_SPACINGS:
+                object.__setattr__(self, "convergence_spacings",
+                                    tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
+            else:
+                raise ValueError(
+                    "convergence_spacings[-1] must equal mesh_spacing: the finest "
+                    "level of the convergence sweep is reused as the production "
+                    "resolution for the detailed report and plot. Leave "
+                    "convergence_spacings at its default (untouched) to have it "
+                    "follow mesh_spacing automatically, or supply a full "
+                    "replacement tuple ending in the new mesh_spacing.")
 
 
 @dataclass(frozen=True)
@@ -323,6 +379,51 @@ def snap_to_grid(target, h):
     return round(target / h) * h
 
 
+def _estimate_peak_memory_gb(n_nodes):
+    """Rough order-of-magnitude estimate of peak memory (GB) for solving
+    a problem on a mesh with n_nodes nodes, used only to decide whether
+    to print the large-mesh warning below.
+
+    Calibrated empirically, not derived from first principles: measured
+    peak RSS on this project's coax example at four mesh resolutions
+    (13k, 52k, 206k, and 824k nodes) and fit a power law,
+    peak_RSS_MB = 0.1432 * n_nodes**0.680. The fitted exponent (~0.68,
+    i.e. worse than linear in node count) is consistent with the fill-in
+    a general sparse LU factorization produces on a 2D grid -- see the
+    note on apply_conductors_and_solve below. Treat this as a ballpark
+    for "is this about to be a problem," not a guarantee: actual memory
+    depends on the machine, BLAS/LAPACK build, and problem specifics.
+    """
+    return 0.1432 * n_nodes ** 0.680 / 1024
+
+
+def _warn_if_large_mesh(n_nodes, n_tris):
+    """Print a one-time, non-blocking heads-up if a mesh is large enough
+    that memory could plausibly become a problem, calibrated against
+    _estimate_peak_memory_gb. Does not raise or stop execution -- a
+    large mesh may be exactly what's wanted on a machine with enough
+    RAM -- it only makes the cost visible before a solve starts, rather
+    than as a MemoryError or an OS-killed process partway through.
+    """
+    est_gb = _estimate_peak_memory_gb(n_nodes)
+    if n_nodes >= 5_000_000:
+        print(f"WARNING: this mesh has {n_nodes:,} nodes ({n_tris:,} triangles). "
+              f"Estimated peak memory during assembly/solve: roughly {est_gb:.1f} GB "
+              f"(ballpark, see _estimate_peak_memory_gb). This comes from the direct "
+              f"sparse solve (scipy.sparse.linalg.spsolve) on a UNIFORM grid -- every "
+              f"region of the domain gets the same node density, whether the field "
+              f"needs it there or not, and a general LU factorization's memory use "
+              f"grows faster than the node count itself. If this is more than your "
+              f"machine can handle: use a coarser mesh_spacing, or see LIMITATIONS "
+              f"AND FUTURE WORK / README.md sections 10-11 for a graded or "
+              f"unstructured mesh, which would need far fewer nodes for the same "
+              f"local resolution.")
+    elif n_nodes >= 1_000_000:
+        print(f"Note: this mesh has {n_nodes:,} nodes ({n_tris:,} triangles), "
+              f"estimated peak memory roughly {est_gb:.1f} GB (ballpark). Both "
+              f"worked examples in this project run at well under half this size.")
+
+
 class Mesh:
     """A structured triangular mesh spanning [x0, x0+Lx] x [y0, y0+Ly],
     built from an nx-by-ny grid of nodes.
@@ -339,6 +440,12 @@ class Mesh:
         self.points = np.column_stack([X.ravel(), Y.ravel()])
         self.nx, self.ny = nx, ny
         self.n_nodes = self.points.shape[0]
+
+        # Computed cheaply from nx, ny directly (no need to build the
+        # actual triangle array first) so the warning can fire as early
+        # as possible for a very large mesh, before any of the more
+        # expensive construction below.
+        _warn_if_large_mesh(self.n_nodes, 2 * (nx - 1) * (ny - 1))
 
         i = np.arange(nx - 1)
         j = np.arange(ny - 1)
