@@ -1078,8 +1078,11 @@ def example_coax(config=None):
               f"{result['C'] * 1e12:12.3f}{err:+8.2f}%")
         C_values.append(result["C"])
     _describe_convergence(C_values)
-    print("Error also shrinks steadily toward 0% here: a circle has no sharp")
-    print("corner, so this is clean h-refinement, unlike example 1 above.")
+    print("Error shrinks toward 0% overall. These five points happen to be")
+    print("monotonic, but that describes this specific sweep, not a general")
+    print("guarantee -- finer intermediate resolutions reveal small reversals")
+    print("too (same non-nested-mesh effect as example 1, far smaller in size;")
+    print("see README.md section 8.2).")
     print()
 
     C, C_ideal = result["C"], result["C_ideal"]

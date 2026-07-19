@@ -371,7 +371,7 @@ unrelated to mesh choice.
 
 ### 5.1 Module Layout
 
-```txt
+```text
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
                      Circle / Rectangle / OutsideCircle
@@ -583,8 +583,9 @@ represent curved or finite-width geometry.
 Both worked examples run a convergence sweep before reporting a final answer,
 and the two behave characteristically differently:
 
-**Coaxial cable** (smooth circular boundary, no sharp corner) — clean, monotonic
-convergence toward the analytical value as $h$ shrinks:
+**Coaxial cable** (smooth circular boundary, no sharp corner) — monotonic
+across the five resolutions tested below, converging toward the analytical
+value as $h$ shrinks:
 
 | $h$ (mm) |   nodes | $C$ (pF/m) |  error |
 | -------: | ------: | ---------: | -----: |
@@ -616,6 +617,20 @@ refinement — which relies on each finer mesh's basis functions being a strict
 superset of the coarser one's — does not apply between them. Treat the finest
 level's answer as accurate to roughly the spread shown in the table, not to
 its last printed digit.
+
+A caveat on the coax table's monotonicity, worth stating precisely rather than
+leaving implied: it describes the five *specific* resolutions tested, not a
+general property of this example. Filling in intermediate resolutions (0.25,
+0.175, 0.125, and 0.0875 mm, each independently re-verified) finds two further
+reversals the published sweep steps over — 0.300 mm to 0.250 mm decreases by
+0.39 pF/m, and 0.150 mm to 0.125 mm decreases by 0.22 pF/m. This is the same
+mechanism as the parallel-plate case above (independent, non-nested structured
+meshes), just far smaller in magnitude here — roughly 0.3-0.5% versus up to
+several percent for the plate's corner-driven swings, since a smooth circular
+boundary has no singularity to amplify the effect. The practical conclusion —
+coax converges markedly better-behaved than the plate — still holds; "clean"
+or unqualified "monotonic" as a property of the *method*, rather than of the
+specific five points shown, does not.
 
 ### 8.3 Material Quadrature: A Negative Result
 
