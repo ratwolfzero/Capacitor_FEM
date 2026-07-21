@@ -51,5 +51,5 @@ def test_infinite_plates(h=0.5e-3, eps_r=1.0, voltage=100.0):
     
     
     test_infinite_plates(h=0.5e-3, eps_r=1, voltage=100.0)
-    test_infinite_plates(h=0.25e-3, eps_r=1, voltage=100.0)   # finer mesh
+    test_infinite_plates(h=0.2e-3, eps_r=1, voltage=100.0)   # finer mesh
     test_infinite_plates(h=0.1e-3,  eps_r=1, voltage=100.0)
