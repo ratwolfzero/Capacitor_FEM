@@ -19,41 +19,44 @@ the derivation starts from Maxwell's equations and builds up.
 
 ## Table of Contents
 
-- [1. Overview](#1-overview)
-- [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
-- [3. Mathematical Formulation](#3-mathematical-formulation)
-  - [3.1 Weak (Variational) Form](#31-weak-variational-form)
-  - [3.2 Galerkin Discretization](#32-galerkin-discretization)
-  - [3.3 Linear Triangular (P1) Elements](#33-linear-triangular-p1-elements)
-  - [3.4 The Element Stiffness Matrix](#34-the-element-stiffness-matrix)
-  - [3.5 Dirichlet Boundary Conditions](#35-dirichlet-boundary-conditions)
-  - [3.6 Field Recovery and Stored Energy](#36-field-recovery-and-stored-energy)
-  - [3.7 Capacitance via the Energy Method](#37-capacitance-via-the-energy-method)
-- [4. Numerical Implementation](#4-numerical-implementation)
-  - [4.1 The Mesh](#41-the-mesh)
-  - [4.2 Conductors as Filled Regions](#42-conductors-as-filled-regions)
-  - [4.3 Grid Alignment: `snap_to_grid`](#43-grid-alignment-snap_to_grid)
-  - [4.4 Vectorized Sparse Assembly](#44-vectorized-sparse-assembly)
-  - [4.5 Material Assignment](#45-material-assignment)
-  - [4.6 Memory and Runtime Scaling](#46-memory-and-runtime-scaling)
-- [5. Software Architecture](#5-software-architecture)
-  - [5.1 Module Layout](#51-module-layout)
-  - [5.2 Configuration](#52-configuration)
-  - [5.3 Geometry and CSG](#53-geometry-and-csg)
-  - [5.4 High-Level API](#54-high-level-api)
-- [6. Installation](#6-installation)
-- [7. Usage](#7-usage)
-  - [7.1 Running the Examples](#71-running-the-examples)
-  - [7.2 Quick Start](#72-quick-start)
-  - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
-- [8. Validation and Verification](#8-validation-and-verification)
-  - [8.1 Exact Analytical Check](#81-exact-analytical-check)
-  - [8.2 Mesh Convergence](#82-mesh-convergence)
-  - [8.3 Material Quadrature: A Negative Result](#83-material-quadrature-a-negative-result)
-- [9. Worked Examples](#9-worked-examples)
-- [10. Known Limitations](#10-known-limitations)
-- [11. Future Work](#11-future-work)
-- [12. License](#12-license)
+- [capacitor-fem](#capacitor-fem)
+  - [Table of Contents](#table-of-contents)
+  - [1. Overview](#1-overview)
+  - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
+  - [3. Mathematical Formulation](#3-mathematical-formulation)
+    - [3.1 Weak (Variational) Form](#31-weak-variational-form)
+    - [3.2 Galerkin Discretization](#32-galerkin-discretization)
+    - [3.3 Linear Triangular (P1) Elements](#33-linear-triangular-p1-elements)
+    - [3.4 The Element Stiffness Matrix](#34-the-element-stiffness-matrix)
+    - [3.5 Dirichlet Boundary Conditions](#35-dirichlet-boundary-conditions)
+    - [3.6 Field Recovery and Stored Energy](#36-field-recovery-and-stored-energy)
+    - [3.7 Capacitance via the Energy Method](#37-capacitance-via-the-energy-method)
+  - [4. Numerical Implementation](#4-numerical-implementation)
+    - [4.1 The Mesh](#41-the-mesh)
+    - [4.2 Conductors as Filled Regions](#42-conductors-as-filled-regions)
+    - [4.3 Grid Alignment: `snap_to_grid`](#43-grid-alignment-snap_to_grid)
+    - [4.4 Vectorized Sparse Assembly](#44-vectorized-sparse-assembly)
+    - [4.5 Material Assignment](#45-material-assignment)
+    - [4.6 Memory and Runtime Scaling](#46-memory-and-runtime-scaling)
+  - [5. Software Architecture](#5-software-architecture)
+    - [5.1 Module Layout](#51-module-layout)
+    - [5.2 Configuration](#52-configuration)
+    - [5.3 Geometry and CSG](#53-geometry-and-csg)
+    - [5.4 High-Level API](#54-high-level-api)
+  - [6. Installation](#6-installation)
+  - [7. Usage](#7-usage)
+    - [7.1 Running the Examples](#71-running-the-examples)
+    - [7.2 Quick Start](#72-quick-start)
+    - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
+  - [8. Validation and Verification](#8-validation-and-verification)
+    - [8.1 Exact Analytical Check](#81-exact-analytical-check)
+    - [8.2 Mesh Convergence](#82-mesh-convergence)
+    - [8.3 Material Quadrature: A Negative Result](#83-material-quadrature-a-negative-result)
+  - [9. Worked Examples](#9-worked-examples)
+    - [9.1 Parallel-Plate Capacitor with a Partial Dielectric Slab](#91-parallel-plate-capacitor-with-a-partial-dielectric-slab)
+    - [9.2 Coaxial Cable](#92-coaxial-cable)
+  - [10. Known Limitations](#10-known-limitations)
+  - [11. Future Work](#11-future-work)
 
 ## 1. Overview
 
@@ -259,7 +262,7 @@ split into two triangles. The diagonal alternates in a checkerboard pattern (not
 always the same direction) specifically to avoid a built-in directional bias in
 the discretization:
 
-```
+```text
 ////        instead of        ////
 \\\\                          ////
 ////                          ////
@@ -333,12 +336,12 @@ factorization, even though the underlying stiffness matrix is symmetric
 positive definite — peak memory was measured to grow *faster* than linear in
 node count:
 
-| $h$ | nodes | measured peak RSS |
-|---:|---:|---:|
-| 0.300 mm | 12,996 | 108 MB |
-| 0.150 mm | 51,984 | 184 MB |
-| 0.075 mm | 206,116 | 523 MB |
-| 0.0375 mm | 824,464 | 1.75 GB |
+|       $h$ |   nodes | measured peak RSS |
+| --------: | ------: | ----------------: |
+|  0.300 mm |  12,996 |            108 MB |
+|  0.150 mm |  51,984 |            184 MB |
+|  0.075 mm | 206,116 |            523 MB |
+| 0.0375 mm | 824,464 |           1.75 GB |
 
 Fitting a power law to these four points gives peak RSS $\approx 0.14 \times
 \text{nodes}^{0.68}$ MB — extrapolating (not measured directly, to avoid risking
@@ -368,7 +371,7 @@ unrelated to mesh choice.
 
 ### 5.1 Module Layout
 
-```
+```text
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
                      Circle / Rectangle / OutsideCircle
@@ -584,23 +587,23 @@ and the two behave characteristically differently:
 across the five resolutions tested below, converging toward the analytical
 value as $h$ shrinks:
 
-| $h$ (mm) | nodes | $C$ (pF/m) | error |
-|---:|---:|---:|---:|
-| 0.300 | 12,996 | 77.311 | −2.76% |
-| 0.200 | 29,241 | 77.813 | −2.12% |
-| 0.150 | 51,984 | 78.495 | −1.27% |
-| 0.100 | 116,281 | 78.593 | −1.14% |
-| 0.075 | 206,116 | 78.910 | −0.75% |
+| $h$ (mm) |   nodes | $C$ (pF/m) |  error |
+| -------: | ------: | ---------: | -----: |
+|    0.300 |  12,996 |     77.311 | −2.76% |
+|    0.200 |  29,241 |     77.813 | −2.12% |
+|    0.150 |  51,984 |     78.495 | −1.27% |
+|    0.100 | 116,281 |     78.593 | −1.14% |
+|    0.075 | 206,116 |     78.910 | −0.75% |
 
 **Parallel plate** (sharp conductor corner) — the same solver, same
 convergence-testing code, deliberately *not* forced to look clean:
 
-| $h$ (mm) | nodes | $C$ (pF/m) | change |
-|---:|---:|---:|---:|
-| 0.400 | 12,467 | 88.805 | — |
-| 0.200 | 49,051 | 93.909 | +5.75% |
-| 0.150 | 87,362 | 93.045 | −0.92% |
-| 0.100 | 195,301 | 97.657 | +4.96% |
+| $h$ (mm) |   nodes | $C$ (pF/m) | change |
+| -------: | ------: | ---------: | -----: |
+|    0.400 |  12,467 |     88.805 |      — |
+|    0.200 |  49,051 |     93.909 | +5.75% |
+|    0.150 |  87,362 |     93.045 | −0.92% |
+|    0.100 | 195,301 |     97.657 | +4.96% |
 
 This second sequence is **not monotonic** (confirmed programmatically at
 runtime by `_describe_convergence`, not asserted in a comment) — it changes
@@ -843,8 +846,3 @@ and don't change accuracy at all:
   this kind of problem — swapping it in naively could trade a clear memory
   error for a worse failure mode (a run that never finishes, with no clear
   signal why).
-
-## 12. License
-
-Add your preferred license here (e.g. MIT is a common choice for a
-self-contained educational/scientific tool like this one).
