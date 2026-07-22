@@ -1,5 +1,7 @@
 # capacitor-fem
 
+Remark: Pending update as a result of current version in development!!!
+
 A self-contained 2D finite-element electrostatics solver for simulating real capacitor
 geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple
 primitives — rather than relying on closed-form formulas that only exist for a handful
