@@ -1,6 +1,6 @@
 # capacitor-fem
 
-Remark: Pending update as a result of current version in development!!!
+## Remark: Pending update as a result of current version in development
 
 A self-contained 2D finite-element electrostatics solver for simulating real capacitor
 geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple
@@ -22,6 +22,7 @@ the derivation starts from Maxwell's equations and builds up.
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
+  - [Remark: Pending update as a result of current version in development](#remark-pending-update-as-a-result-of-current-version-in-development)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
