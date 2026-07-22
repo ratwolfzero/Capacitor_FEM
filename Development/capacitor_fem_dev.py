@@ -52,7 +52,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
 EPS0 = 8.8541878128e-12  # vacuum permittivity [F/m]
-OUTPUT_DIR = ""  # where the example figures are written
+OUTPUT_DIR = "Development"  # where the example figures are written
 
 
 # =============================================================================
