@@ -890,7 +890,7 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
     ax.streamplot(xs, ys, ExG, EyG, color="white",
-                  density=style.streamline_density, linewidth=0.6, arrowsize=0.8)
+                  density=style.streamline_density, linewidth=0.6, arrowsize=0.8, minlength=0.01)
     outline(ax)
     ax.set_title("Electric field + field lines")
 
