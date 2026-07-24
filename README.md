@@ -57,7 +57,6 @@ the derivation starts from Maxwell's equations and builds up.
     - [9.2 Coaxial Cable](#92-coaxial-cable)
   - [10. Known Limitations](#10-known-limitations)
   - [11. Future Work](#11-future-work)
-  - [12. License](#12-license)
 
 ## 1. Overview
 
@@ -897,8 +896,3 @@ and don't change accuracy at all:
   this kind of problem — swapping it in naively could trade a clear memory
   error for a worse failure mode (a run that never finishes, with no clear
   signal why).
-
-## 12. License
-
-Add your preferred license here (e.g. MIT is a common choice for a
-self-contained educational/scientific tool like this one).
