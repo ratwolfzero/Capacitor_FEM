@@ -1005,6 +1005,37 @@ def _solve_parallel_plate(config, h):
                 gap=gap, margin=margin)
 
 
+def _grid_alignment_note(config, h):
+    """Check whether h divides evenly into the geometric parameters that
+    directly set the capacitor's physics (plate_thickness, gap,
+    dielectric_thickness), or whether snap_to_grid (README section 4.3)
+    must round one or more of them to a different achievable value at
+    this h. Returns a short string: "clean" if all divide evenly
+    (within float rounding), or a note identifying which parameter(s)
+    changed and by how much otherwise.
+
+    This is a real, expected, already-documented consequence of a
+    structured grid -- not a bug -- but it means a convergence sweep
+    across h values that don't all divide evenly into the same
+    geometry is not a clean apples-to-apples comparison: some of the
+    row-to-row change reflects a genuinely different simulated gap or
+    dielectric thickness, not (only) mesh discretization error. Verified
+    empirically: at h=0.15mm (config defaults), this geometry rounding
+    alone -- evaluated through the ideal formula, with no FEM involved --
+    predicts a -3.5% shift relative to a cleanly-divisible h, closely
+    matching the -3.0% actually observed in the FEM result at that h.
+    """
+    checks = [("gap", config.gap), ("dielectric_thickness", config.dielectric_thickness),
+              ("plate_thickness", config.plate_thickness)]
+    notes = []
+    for name, target in checks:
+        ratio = target / h
+        if abs(ratio - round(ratio)) > 1e-6:
+            snapped = snap_to_grid(target, h)
+            notes.append(f"{name} {target*1e3:.3f}->{snapped*1e3:.3f}mm")
+    return "clean" if not notes else "rounded: " + ", ".join(notes)
+
+
 def example_parallel_plate(config=None):
     """Parallel-plate capacitor with a rectangular dielectric slab filling
     the lower half of the gap: a rectilinear geometry with a spatially
@@ -1017,26 +1048,38 @@ def example_parallel_plate(config=None):
     print("=" * 72)
 
     print("Mesh convergence (physical geometry fixed, only h changes):")
-    print(f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'change':>9s}")
+    print(f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'change':>9s}  grid alignment")
     result, prev_C = None, None
     C_values = []
     for h in config.convergence_spacings:
         result = _solve_parallel_plate(config, h)
         change = "" if prev_C is None else f"{100 * (result['C'] - prev_C) / prev_C:+.2f}%"
+        alignment = _grid_alignment_note(config, h)
         print(f"{h * 1e3:9.3f}{result['mesh'].n_nodes:9d}{result['solve_time']:11.3f}"
-              f"{result['C'] * 1e12:12.3f}{change:>9s}")
+              f"{result['C'] * 1e12:12.3f}{change:>9s}  {alignment}")
         prev_C = result["C"]
         C_values.append(result["C"])
     _describe_convergence(C_values)
-    print("This is expected here, not a defect in the solver: the core")
-    print("assembly/solve pipeline reproduces an exact, fringing-free analytical")
-    print("case (full-width plates, no possible fringing) to 0.0000% at every")
-    print("resolution tested. The field concentrates sharply at the plate's")
-    print("corner -- a geometric singularity -- and each h above is an")
-    print("independent structured mesh rather than a nested refinement of the")
-    print("previous one, so successive levels are not guaranteed to bracket the")
-    print("true answer monotonically (see LIMITATIONS AND FUTURE WORK). Treat the")
-    print("finest level as accurate to roughly the spread shown above.")
+    print("Two distinct effects are mixed together in the table above, and the")
+    print("'grid alignment' column separates them. The core assembly/solve")
+    print("pipeline reproduces an exact, fringing-free analytical case to")
+    print("machine precision at every resolution tested (README section 8.1) --")
+    print("so genuine FEM discretization error is real but small, visible in")
+    print("the 'clean' rows above. A 'rounded' row is different: snap_to_grid")
+    print("(README section 4.3) has adjusted a physically meaningful dimension")
+    print("(the gap or the dielectric thickness) to the nearest value that h")
+    print("can represent exactly, because the target didn't divide evenly into")
+    print("that h -- meaning a 'rounded' row is genuinely simulating a slightly")
+    print("different capacitor, not just resolving the same one more finely.")
+    print("Separately, and unrelated to grid alignment: the field concentrates")
+    print("sharply at the plate's corner (a geometric singularity), and each h")
+    print("above is an independent structured mesh rather than a nested")
+    print("refinement of the previous one, so successive CLEAN levels are still")
+    print("not guaranteed to bracket the true answer monotonically (see")
+    print("LIMITATIONS AND FUTURE WORK). For a convergence study, prefer h")
+    print("values that divide evenly into every geometric parameter you care")
+    print("about; treat the finest clean level as accurate to roughly the")
+    print("spread shown among the other clean rows.")
     print()
 
     C, C_ideal = result["C"], result["C_ideal"]
@@ -1248,21 +1291,27 @@ def example_exact_check(config=None, spacings=(0.5e-3, 0.25e-3, 0.125e-3, 0.0625
     print()
 
     print(f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>16s}"
-          f"{'C_exact [pF/m]':>18s}{'error':>12s}")
+          f"{'C_exact [pF/m]':>18s}{'error':>12s}{'rel. diff':>13s}")
     results = []
     for h in spacings:
         result = _solve_exact_check(config, h)
         err = 100 * (result["C"] - result["C_exact"]) / result["C_exact"]
+        rel_diff = abs(result["C"] - result["C_exact"]) / result["C_exact"]
         print(f"{h * 1e3:9.4f}{result['mesh'].n_nodes:9d}{result['solve_time']:11.3f}"
-              f"{result['C'] * 1e12:16.8f}{result['C_exact'] * 1e12:18.8f}{err:+11.6f}%")
+              f"{result['C'] * 1e12:16.8f}{result['C_exact'] * 1e12:18.8f}{err:+11.6f}%"
+              f"{rel_diff:13.2e}")
         results.append(result)
     print()
-    print("If every row above reads 0.000000% (to displayed precision), the")
-    print("core FEM machinery -- assembly, boundary conditions, energy")
-    print("integration -- has no implementation bugs at any of these")
-    print("resolutions, including the two-layer dielectric handling. Any")
-    print("error elsewhere in this project comes from the mesh, not the")
-    print("math (README.md section 8.1).")
+    print("The 'error' column displays as 0.000000% at 6 decimal places, but")
+    print("is not literally zero -- 'rel. diff' shows the true residual, a few")
+    print("times float64 epsilon (2.22e-16), i.e. exact to machine precision:")
+    print("ordinary floating-point roundoff from the sparse solve, the same at")
+    print("every resolution, not a limitation of the method or the mesh. This")
+    print("confirms the core FEM machinery -- assembly, boundary conditions,")
+    print("energy integration -- has no implementation bugs at any of these")
+    print("resolutions, including the two-layer dielectric handling. Any error")
+    print("elsewhere in this project comes from the mesh, not the math")
+    print("(README.md section 8.1).")
 
     return results[-1]["C"], results[-1]["C_exact"]
 

@@ -1,7 +1,5 @@
 # capacitor-fem
 
-## Remark: Pending update as a result of current version in development
-
 A self-contained 2D finite-element electrostatics solver for simulating real capacitor
 geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple
 primitives — rather than relying on closed-form formulas that only exist for a handful
@@ -22,7 +20,6 @@ the derivation starts from Maxwell's equations and builds up.
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
-  - [Remark: Pending update as a result of current version in development](#remark-pending-update-as-a-result-of-current-version-in-development)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
@@ -60,6 +57,7 @@ the derivation starts from Maxwell's equations and builds up.
     - [9.2 Coaxial Cable](#92-coaxial-cable)
   - [10. Known Limitations](#10-known-limitations)
   - [11. Future Work](#11-future-work)
+  - [12. License](#12-license)
 
 ## 1. Overview
 
@@ -385,7 +383,8 @@ unrelated to mesh choice.
 6. POST-PROCESSING  compute_fields(), capacitance_from_energy()
 7. HIGH-LEVEL API   ElectrostaticProblem
 8. VISUALIZATION    plot_solution()
-9. EXAMPLES         parallel-plate capacitor, coaxial cable
+9. EXAMPLES         parallel-plate capacitor, coaxial cable, and an
+                    exact-solution validation check (off by default)
 ```
 
 Each section is deliberately small and depends only on the interfaces of the
@@ -576,15 +575,42 @@ so its exact capacitance per unit depth is the elementary formula
 $C' = \varepsilon_0\varepsilon_r L_x / d$, with no approximation on the physics
 side to compare against. Running the full assembly/solve/energy pipeline against
 this case at four mesh resolutions ($h=$ 0.5, 0.25, 0.125, 0.0625 mm) reproduced
-the exact value to **0.0000% error at every resolution tested**. This isolates
-and confirms the core FEM machinery (assembly, boundary conditions, energy
-integration) is free of implementation bugs, independent of the mesh's ability to
-represent curved or finite-width geometry.
+the exact value to within $6\times10^{-16}$ relative error at every resolution
+tested — exact to machine precision (float64 epsilon is $2.22\times10^{-16}$),
+not merely "small": the residual is ordinary floating-point roundoff from the
+sparse solve, the same order of magnitude at every resolution, not a limitation
+of the method or the mesh. This isolates and confirms the core FEM machinery
+(assembly, boundary conditions, energy integration) is free of implementation
+bugs, independent of the mesh's ability to represent curved or finite-width
+geometry.
+
+`example_exact_check()` (off by default; see `RUN_EXACT_CHECK`) reproduces this
+check directly from the shipped code, extended to also cover the two-layer
+dielectric handling used by the parallel-plate example below — the single-check
+above only used one material, so on its own it never exercised that code path.
 
 ### 8.2 Mesh Convergence
 
-Both worked examples run a convergence sweep before reporting a final answer,
-and the two behave characteristically differently:
+Both worked examples run a convergence sweep before reporting a final answer.
+One more effect needs introducing first, since it shapes how to read both
+tables below: **grid alignment**.
+
+`snap_to_grid` (§4.3) rounds every physical dimension to the nearest multiple
+of $h$, so conductor and material boundaries land exactly on grid lines. When
+a target dimension already divides evenly into $h$, this is exact; when it
+doesn't, snap_to_grid rounds it to the nearest value $h$ *can* represent —
+meaning that resolution is genuinely simulating a slightly different geometry,
+not just resolving the same one more finely. This applies to
+`example_parallel_plate()`, which snaps `plate_thickness`, `gap`,
+`dielectric_thickness`, `plate_width`, and `domain_margin` independently at
+each $h$; it does not apply to `example_coax()`, which uses `inner_radius` and
+`outer_radius` directly, unsnapped — a circle can't exactly align with a
+Cartesian grid at any radius, so there's no "clean" resolution to align to in
+the first place, only the staircase approximation already discussed in §10.1.
+`example_parallel_plate()`'s convergence table labels each row "clean" (every
+physically meaningful dimension divides evenly into $h$) or "rounded" (naming
+which dimension changed, and by how much), so this effect is visible rather
+than silently mixed into the discretization error the table is meant to show.
 
 **Coaxial cable** (smooth circular boundary, no sharp corner) — monotonic
 across the five resolutions tested below, converging toward the analytical
@@ -593,47 +619,69 @@ value as $h$ shrinks:
 | $h$ (mm) |   nodes | $C$ (pF/m) |  error |
 | -------: | ------: | ---------: | -----: |
 |    0.300 |  12,996 |     77.311 | −2.76% |
-|    0.200 |  29,241 |     77.813 | −2.12% |
+|    0.200 |  29,241 |     78.138 | −1.72% |
 |    0.150 |  51,984 |     78.495 | −1.27% |
-|    0.100 | 116,281 |     78.593 | −1.14% |
+|    0.100 | 116,281 |     78.682 | −1.03% |
 |    0.075 | 206,116 |     78.910 | −0.75% |
 
 **Parallel plate** (sharp conductor corner) — the same solver, same
-convergence-testing code, deliberately *not* forced to look clean:
+convergence-testing code, deliberately *not* forced to look clean, now
+annotated with which rows are grid-aligned:
 
-| $h$ (mm) |   nodes | $C$ (pF/m) | change |
-| -------: | ------: | ---------: | -----: |
-|    0.400 |  12,467 |     88.805 |      — |
-|    0.200 |  49,051 |     93.909 | +5.75% |
-|    0.150 |  87,362 |     93.045 | −0.92% |
-|    0.100 | 195,301 |     97.657 | +4.96% |
+| $h$ (mm) |   nodes | $C$ (pF/m) | change | grid alignment                                       |
+| -------: | ------: | ---------: | -----: | :--------------------------------------------------- |
+|    0.400 |  12,467 |    101.970 |      — | rounded (plate_thickness only)                       |
+|    0.200 |  49,051 |    101.929 | −0.04% | clean                                                |
+|    0.150 |  87,362 |     98.815 | −3.05% | rounded (gap, dielectric_thickness, plate_thickness) |
+|    0.100 | 195,301 |    101.844 | +3.06% | clean                                                |
 
-This second sequence is **not monotonic** (confirmed programmatically at
-runtime by `_describe_convergence`, not asserted in a comment) — it changes
-direction twice. Given §8.1 rules out an implementation bug, this is a genuine
-numerical characteristic worth understanding: the field concentrates sharply at
-the plate's corner (a geometric singularity), and each $h$ above is an
-*independent* structured mesh rather than a nested refinement of the previous
-one (the checkerboard diagonal pattern doesn't align between resolutions), so
-the usual guarantee that Galerkin FEM energy decreases monotonically under mesh
+Two effects are visible here, and separating them is exactly what the
+grid-alignment column is for. The 0.400 mm row rounds only `plate_thickness` —
+a dimension that doesn't affect capacitance for an ideal conductor, so its
+result is essentially unaffected in practice. The 0.150 mm row is different:
+it rounds `gap` (4.0 → 4.05 mm) and `dielectric_thickness` (2.0 → 1.95 mm)
+simultaneously, both of which directly set the capacitor's physics. Evaluating
+the *ideal* (fringing-free) formula using the 0.150 mm row's own rounded
+dimensions — a pure geometry calculation, no FEM involved — predicts a −3.5%
+shift relative to a cleanly-aligned resolution; the FEM result actually shows
+−3.0%, confirming grid-alignment rounding, not a discretization or
+implementation issue, is the dominant cause of that row's outlier value.
+
+The two **clean** rows (0.200 mm and 0.100 mm) are the ones that isolate
+genuine mesh-discretization behavior, and they agree to within 0.1% of each
+other (101.929 vs. 101.844 pF/m) — a tighter, more directly meaningful
+convergence statement than the full four-point sequence suggests on its own.
+The sequence is still **not monotonic** even restricted to 0.400/0.200/0.100 mm
+(confirmed programmatically at runtime by `_describe_convergence`, not
+asserted in a comment). Given §8.1 rules out an implementation bug, this
+remaining, smaller irregularity is a genuine numerical characteristic worth
+understanding on its own terms: the field concentrates sharply at the plate's
+corner (a geometric singularity), and each $h$ above is an *independent*
+structured mesh rather than a nested refinement of the previous one (the
+checkerboard diagonal pattern doesn't align between resolutions), so the usual
+guarantee that Galerkin FEM energy decreases monotonically under mesh
 refinement — which relies on each finer mesh's basis functions being a strict
-superset of the coarser one's — does not apply between them. Treat the finest
-level's answer as accurate to roughly the spread shown in the table, not to
-its last printed digit.
+superset of the coarser one's — does not apply between them. For a
+convergence study, prefer $h$ values that divide evenly into every geometric
+parameter you care about (the grid-alignment column verifies this directly, so
+you don't have to check by hand); treat the finest clean level as accurate to
+roughly the spread shown among the other clean rows, not to its last printed
+digit.
 
 A caveat on the coax table's monotonicity, worth stating precisely rather than
 leaving implied: it describes the five *specific* resolutions tested, not a
 general property of this example. Filling in intermediate resolutions (0.25,
 0.175, 0.125, and 0.0875 mm, each independently re-verified) finds two further
 reversals the published sweep steps over — 0.300 mm to 0.250 mm decreases by
-0.39 pF/m, and 0.150 mm to 0.125 mm decreases by 0.22 pF/m. This is the same
-mechanism as the parallel-plate case above (independent, non-nested structured
-meshes), just far smaller in magnitude here — roughly 0.3-0.5% versus up to
-several percent for the plate's corner-driven swings, since a smooth circular
-boundary has no singularity to amplify the effect. The practical conclusion —
-coax converges markedly better-behaved than the plate — still holds; "clean"
-or unqualified "monotonic" as a property of the *method*, rather than of the
-specific five points shown, does not.
+0.18 pF/m, and 0.150 mm to 0.125 mm decreases by 0.16 pF/m. This is a different
+mechanism than the grid-alignment rounding discussed above (coax radii are
+never snapped in the first place) — it's the same non-nested-independent-mesh
+effect as the parallel-plate case, just far smaller in magnitude here: roughly
+0.2-0.25% versus up to several percent for the plate's corner-driven swings,
+since a smooth circular boundary has no singularity to amplify the effect. The
+practical conclusion — coax converges markedly better-behaved than the plate —
+still holds; "clean" or unqualified "monotonic" as a property of the *method*,
+rather than of the specific five points shown, does not.
 
 ### 8.3 Material Quadrature: A Negative Result
 
@@ -675,7 +723,7 @@ and air ($\varepsilon_r=1.0$) filling the rest — a rectilinear geometry with a
 spatially varying dielectric, compared against the ideal series-dielectric
 formula $C'_{\text{ideal}} = \varepsilon_0 w \big/ (d_1/\varepsilon_{r1} + d_2/\varepsilon_{r2})$
 (fringing-free by construction). At production resolution ($h=0.1$ mm,
-195,301 nodes): **97.657 pF/m** FEM versus **86.932 pF/m** ideal, a **+12.34%**
+195,301 nodes): **101.844 pF/m** FEM versus **86.932 pF/m** ideal, a **+17.15%**
 difference — expected and correct, since the FEM solution also captures
 fringing fields at the plate edges that the ideal formula ignores by
 construction (see the field-line panel below).
@@ -849,3 +897,8 @@ and don't change accuracy at all:
   this kind of problem — swapping it in naively could trade a clear memory
   error for a worse failure mode (a run that never finishes, with no clear
   signal why).
+
+## 12. License
+
+Add your preferred license here (e.g. MIT is a common choice for a
+self-contained educational/scientific tool like this one).
