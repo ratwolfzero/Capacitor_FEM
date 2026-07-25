@@ -73,7 +73,8 @@ class ParallelPlateConfig:
     gap: float = 4e-3
     dielectric_thickness: float = 2e-3    # slab fills the lower half of the gap
     plate_width: float = 24e-3
-    domain_margin: float = 15e-3          # clearance between the plates and the domain edge
+    # clearance between the plates and the domain edge
+    domain_margin: float = 15e-3
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5         # e.g. glass
     background_eps_r: float = 1.0         # e.g. air
@@ -104,7 +105,8 @@ class ParallelPlateConfig:
     # resolution) at the new mesh_spacing. Neither is a dataclass field
     # (ClassVar), so neither appears in __init__.
     _CONVERGENCE_RATIOS: ClassVar[tuple] = (4.0, 2.0, 1.5, 1.0)
-    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (0.4e-3, 0.2e-3, 0.15e-3, 0.1e-3)
+    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (
+        0.4e-3, 0.2e-3, 0.15e-3, 0.1e-3)
 
     def __post_init__(self):
         if self.convergence_spacings[-1] != self.mesh_spacing:
@@ -115,7 +117,7 @@ class ParallelPlateConfig:
                 # object.__setattr__ is the standard way to set a
                 # computed value from __post_init__.
                 object.__setattr__(self, "convergence_spacings",
-                                    tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
+                                   tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
             else:
                 raise ValueError(
                     "convergence_spacings[-1] must equal mesh_spacing: the finest "
@@ -136,8 +138,10 @@ class CoaxConfig:
     outer_radius: float = 15e-3
     domain_half_width: float = 17e-3      # simulation domain extends to +/- this
     voltage: float = 100.0
-    dielectric_eps_r: float = 2.3          # e.g. polyethylene, a common coax dielectric
-    background_eps_r: float = 1.0          # only matters outside the dielectric fill radius
+    # e.g. polyethylene, a common coax dielectric
+    dielectric_eps_r: float = 2.3
+    # only matters outside the dielectric fill radius
+    background_eps_r: float = 1.0
     mesh_spacing: float = 0.075e-3
 
     # See ParallelPlateConfig.convergence_spacings for why this is a
@@ -150,13 +154,14 @@ class CoaxConfig:
     # convergence_spacings left at the literal default above), the result
     # is as numerically clean as a derived value can be.
     _CONVERGENCE_RATIOS: ClassVar[tuple] = (4.0, 8 / 3, 2.0, 4 / 3, 1.0)
-    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (0.3e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.075e-3)
+    _DEFAULT_CONVERGENCE_SPACINGS: ClassVar[tuple] = (
+        0.3e-3, 0.2e-3, 0.15e-3, 0.1e-3, 0.075e-3)
 
     def __post_init__(self):
         if self.convergence_spacings[-1] != self.mesh_spacing:
             if self.convergence_spacings == self._DEFAULT_CONVERGENCE_SPACINGS:
                 object.__setattr__(self, "convergence_spacings",
-                                    tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
+                                   tuple(r * self.mesh_spacing for r in self._CONVERGENCE_RATIOS))
             else:
                 raise ValueError(
                     "convergence_spacings[-1] must equal mesh_spacing: the finest "
@@ -176,7 +181,8 @@ class PlotConfig:
     potential_fill_levels: int = 25
     potential_line_levels: int = 15
     streamline_density: float = 1.1
-    energy_density_floor: float = 1e-4    # log-scale color vmin, as a fraction of vmax
+    # log-scale color vmin, as a fraction of vmax
+    energy_density_floor: float = 1e-4
     conductor_fill_color: str = "dimgray"
     conductor_outline_color: str = "black"
     conductor_outline_width: float = 1.3
@@ -581,7 +587,8 @@ def evaluate_material(mesh, eps_r_of_xy):
     see LIMITATIONS AND FUTURE WORK.
     """
     cxy = mesh.centroids()
-    return eps_r_of_xy(cxy[:, 0], cxy[:, 1]) * EPS0   # (T,) absolute permittivity
+    # (T,) absolute permittivity
+    return eps_r_of_xy(cxy[:, 0], cxy[:, 1]) * EPS0
 
 
 def assemble_stiffness(mesh, eps_elem):
@@ -757,14 +764,15 @@ class ElectrostaticProblem:
             shape.eps_r = eps_r
         if shape.eps_r is None:
             raise ValueError("add_dielectric: shape has no eps_r set "
-                              "(pass eps_r= or set shape.eps_r first)")
+                             "(pass eps_r= or set shape.eps_r first)")
         self.dielectrics.append(shape)
         return shape
 
     def solve(self):
         """Run the full pipeline and store V, fields, and stored energy
         as attributes. Returns self, so calls can be chained."""
-        self.eps_r_of_xy = make_eps_r_function(self.dielectrics, self.background_eps_r)
+        self.eps_r_of_xy = make_eps_r_function(
+            self.dielectrics, self.background_eps_r)
         self.eps_elem = evaluate_material(self.mesh, self.eps_r_of_xy)
         K, area, area2, b, c = assemble_stiffness(self.mesh, self.eps_elem)
         self.V, self.is_fixed, self.solve_time = apply_conductors_and_solve(
@@ -795,7 +803,7 @@ class ElectrostaticProblem:
 # =============================================================================
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
-                   title, fname, xlim=None, ylim=None, style=None):
+                  title, fname, xlim=None, ylim=None, style=None):
     """Render a four-panel summary figure: dielectric map, equipotential
     contours, field magnitude with streamlines, and energy density.
 
@@ -878,7 +886,8 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
 
     # --- panel 2: potential contours ---------------------------------------
     ax = axes[0, 1]
-    cf = ax.contourf(X, Y, V_grid, levels=style.potential_fill_levels, cmap="viridis")
+    cf = ax.contourf(
+        X, Y, V_grid, levels=style.potential_fill_levels, cmap="viridis")
     ax.contour(X, Y, V_grid, levels=style.potential_line_levels,
                colors="white", linewidths=0.4, alpha=0.6)
     fig.colorbar(cf, ax=ax, label="V [Volt]")
@@ -898,9 +907,9 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     ax = axes[1, 1]
     vmax = energy_density.max()
     tpc = ax.tripcolor(mesh.points[:, 0], mesh.points[:, 1], mesh.triangles,
-                        facecolors=energy_masked, cmap=cmap_magma,
-                        norm=mcolors.LogNorm(vmin=vmax * style.energy_density_floor,
-                                              vmax=vmax))
+                       facecolors=energy_masked, cmap=cmap_magma,
+                       norm=mcolors.LogNorm(vmin=vmax * style.energy_density_floor,
+                                            vmax=vmax))
     fig.colorbar(tpc, ax=ax, label=r"energy density [J/m$^3$]")
     outline(ax)
     ax.set_title("Energy density (log scale)")
@@ -977,16 +986,17 @@ def _solve_parallel_plate(config, h):
     y_gap_hi = y_gap_lo + gap
 
     bottom_plate = Rectangle(x_plate0, margin, plate_w, plate_t,
-                              voltage=0.0, name="bottom_plate")
+                             voltage=0.0, name="bottom_plate")
     top_plate = Rectangle(x_plate0, y_gap_hi, plate_w, plate_t,
-                           voltage=config.voltage, name="top_plate")
+                          voltage=config.voltage, name="top_plate")
     conductors = [bottom_plate, top_plate]
 
     dielectric = Material("dielectric_slab", eps_r=config.dielectric_eps_r)
     background = Material("background", eps_r=config.background_eps_r)
     slab = Rectangle(x_plate0, y_gap_lo, plate_w, dielectric_t,
-                      eps_r=dielectric.eps_r, name="dielectric_slab")
-    eps_r_of_xy = make_eps_r_function([slab], background_eps_r=background.eps_r)
+                     eps_r=dielectric.eps_r, name="dielectric_slab")
+    eps_r_of_xy = make_eps_r_function(
+        [slab], background_eps_r=background.eps_r)
 
     mesh = Mesh(0, 0, Lx, Ly, nx=nx, ny=ny)
     eps_elem = evaluate_material(mesh, eps_r_of_xy)
@@ -996,7 +1006,7 @@ def _solve_parallel_plate(config, h):
         mesh, V, eps_elem, b, c, area, area2)
     C = capacitance_from_energy(W, config.voltage, 0.0)
     C_ideal = plate_w * EPS0 / (dielectric_t / dielectric.eps_r
-                                 + (gap - dielectric_t) / background.eps_r)
+                                + (gap - dielectric_t) / background.eps_r)
 
     return dict(h=h, mesh=mesh, conductors=conductors, eps_r_of_xy=eps_r_of_xy,
                 V=V, is_fixed=is_fixed, energy_density=energy_density,
@@ -1112,15 +1122,16 @@ def _solve_coax(config, h):
     ny = nx
 
     inner = Circle((0, 0), config.inner_radius, voltage=config.voltage,
-                    name="inner_conductor")
+                   name="inner_conductor")
     outer = OutsideCircle((0, 0), config.outer_radius, voltage=0.0,
-                           name="outer_conductor")
+                          name="outer_conductor")
     conductors = [inner, outer]
 
     dielectric = Material("dielectric_fill", eps_r=config.dielectric_eps_r)
     fill = Circle((0, 0), config.outer_radius, eps_r=dielectric.eps_r,
                   name="dielectric_fill")
-    eps_r_of_xy = make_eps_r_function([fill], background_eps_r=config.background_eps_r)
+    eps_r_of_xy = make_eps_r_function(
+        [fill], background_eps_r=config.background_eps_r)
 
     half = config.domain_half_width
     mesh = Mesh(-half, -half, 2 * half, 2 * half, nx=nx, ny=ny)
@@ -1151,7 +1162,8 @@ def example_coax(config=None):
     print("=" * 72)
 
     print("Mesh convergence (smooth circular boundary, no sharp corner):")
-    print(f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'error':>9s}")
+    print(
+        f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'error':>9s}")
     result = None
     C_values = []
     for h in config.convergence_spacings:
@@ -1219,16 +1231,17 @@ def _solve_exact_check(config, h):
     # ever within view.
     overhang = Lx
     bottom_plate = Rectangle(-overhang, margin, Lx + 2 * overhang, plate_t,
-                              voltage=0.0, name="bottom_plate")
+                             voltage=0.0, name="bottom_plate")
     top_plate = Rectangle(-overhang, y_gap_hi, Lx + 2 * overhang, plate_t,
-                           voltage=config.voltage, name="top_plate")
+                          voltage=config.voltage, name="top_plate")
     conductors = [bottom_plate, top_plate]
 
     dielectric = Material("dielectric_slab", eps_r=config.dielectric_eps_r)
     background = Material("background", eps_r=config.background_eps_r)
     slab = Rectangle(-overhang, y_gap_lo, Lx + 2 * overhang, dielectric_t,
-                      eps_r=dielectric.eps_r, name="dielectric_slab")
-    eps_r_of_xy = make_eps_r_function([slab], background_eps_r=background.eps_r)
+                     eps_r=dielectric.eps_r, name="dielectric_slab")
+    eps_r_of_xy = make_eps_r_function(
+        [slab], background_eps_r=background.eps_r)
 
     mesh = Mesh(0, 0, Lx, Ly, nx=nx, ny=ny)
     eps_elem = evaluate_material(mesh, eps_r_of_xy)
@@ -1241,7 +1254,7 @@ def _solve_exact_check(config, h):
     # theory is not an approximation of this geometry, it IS this
     # geometry's solution (the field is exactly 1D, by construction).
     C_exact = Lx * EPS0 / (dielectric_t / dielectric.eps_r
-                            + (gap - dielectric_t) / background.eps_r)
+                           + (gap - dielectric_t) / background.eps_r)
 
     return dict(h=h, mesh=mesh, C=C, C_exact=C_exact, solve_time=solve_time)
 
