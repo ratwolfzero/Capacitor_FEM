@@ -772,32 +772,6 @@ boundaries, where it is a small (§8.3), measured source of mesh-dependence — 
 where refining the *material* sampling doesn't help, since the conductor
 boundary's own node classification dominates.
 
-**10.4 — Boundary classification is sensitive to the last bit of floating-point
-precision, independent of mesh resolution.** `snap_to_grid` (§4.3) deliberately
-makes conductor and material edges land exactly on grid lines, and
-`Shape.contains()` classifies nodes with strict `<=`/`>=` comparisons against
-those edges. Both are correct in exact arithmetic, but in floating-point
-arithmetic, two *mathematically equivalent* ways of computing "the same"
-boundary coordinate — e.g. a literal `0.15e-3` versus an arithmetically derived
-`1.5 * 0.1e-3`, which differ at the last representable bit — can round to
-different floats, and a `<=`/`>=` test evaluated at that coordinate can then
-flip for an *entire row or column* of nodes at once, since every node in that
-row shares the same coordinate. This is not hypothetical: it was found while
-building the `mesh_spacing` → `convergence_spacings` auto-derivation in §5.2,
-where an earlier version of that mechanism reclassified one full row of nodes
-as conductor for the *default* parallel-plate configuration, changing the
-reported capacitance by several percent. The fix there was to keep the
-default construction path on the exact literal values this project's results
-are validated against (§5.2), which is a mitigation for that specific case,
-not a general one — the underlying sensitivity is a property of comparing
-independently-computed floats at a shared boundary, and could in principle
-recur wherever a boundary coordinate is computed two different ways. A
-proper fix needs either tolerance-based classification (accept a node as
-"on the boundary" within some epsilon, rather than by exact comparison) or a
-conforming mesh where a boundary node's position and the boundary's position
-are the same computation by construction, not two values compared after the
-fact — the latter is the same unstructured-mesh direction as 10.1.
-
 ## 11. Future Work
 
 Ordered roughly by leverage (how much of §10 it addresses) against cost (new
@@ -813,15 +787,6 @@ dependencies, implementation complexity):
   consume `mesh.points` and `mesh.triangles` — so this is a `Mesh`-class swap,
   not a solver rewrite. It does add `gmsh` as a native dependency, which is why
   it isn't included by default.
-
-- **Tolerance-based boundary classification — a small, targeted fix for 10.4
-  specifically.** Replace `Shape.contains()`'s exact `<=`/`>=` comparisons with
-  a small-epsilon tolerance, so a node "on" a boundary is classified
-  consistently regardless of which of two equivalent arithmetic paths produced
-  its coordinate. Narrow in scope (doesn't touch 10.1–10.3) but cheap and
-  dependency-free; worth doing independently of the larger mesh changes below,
-  since 10.4 can in principle affect any future code path that computes a
-  boundary coordinate a new way, not just the one instance found so far.
 
 - **Graded (non-uniform) structured mesh — a concrete, dependency-free
   intermediate step.** Keep the Cartesian, dependency-free mesh, but space grid
