@@ -14,7 +14,6 @@ validation tables, or usage examples already covered in the main README.md.
 | Feature                 | Original                 | This variant                                        |
 | ----------------------- | ------------------------ | --------------------------------------------------- |
 | Mesh                    | Uniform Cartesian only   | Uniform **or** piecewise-uniform (graded) Cartesian |
-| Boundary classification | Strict `<=` / `>=`       | Tolerant (`_BOUNDARY_TOL = 1e-9` m)                 |
 | Startup check           | None                     | §10.4 floating-point stress test                    |
 | Dependencies            | numpy, scipy, matplotlib | **unchanged** (still zero native deps)              |
 
@@ -94,46 +93,6 @@ delta.
 
 ## 3. §10.4 boundary-tolerance hardening
 
-### Motivation boundary-tolerance hardening
-
-`snap_to_grid` and `np.linspace` can produce boundary coordinates that
-differ by a few ULPs even when they are mathematically identical. A strict
-`<=` / `>=` comparison then flips an entire row or column of nodes,
-changing capacitance by several percent. This was observed in practice
-while implementing the `mesh_spacing → convergence_spacings` auto-derivation.
-
-### The fix
-
-A single constant:
-
-```python
-_BOUNDARY_TOL = 1e-9  # meters
-```
-
-applied in every primitive `contains()`:
-
-```python
-# Rectangle
-(x >= self.x0 - _BOUNDARY_TOL) & (x <= self.x0 + self.width + _BOUNDARY_TOL) & ...
-
-# Circle
-(x-cx)**2 + (y-cy)**2 <= (radius + _BOUNDARY_TOL)**2
-
-# OutsideCircle (complement — tolerance applied inward)
-(x-cx)**2 + (y-cy)**2 >= (radius - _BOUNDARY_TOL)**2
-```
-
-CSG shapes (`Union`, `Intersection`, `Difference`) simply combine the
-masks returned by the primitives, so the tolerance propagates automatically.
-
-The tolerance is:
-
-- many orders of magnitude larger than observed float64 noise (~1e-18 … 1e-15 m),
-- many orders of magnitude smaller than the finest grid spacing used in the
-  project (75 µm),  
-  therefore it can only rescue a node that arithmetic nudged off its
-  intended exact position; it cannot reach a neighbouring grid point.
-
 ### Startup stress test
 
 `verify_boundary_tolerance()` runs automatically when the script is
@@ -155,12 +114,6 @@ classification remains stable. A failure would print a clear diagnostic.
   four-panel visualisation.
 
 ---
-
-## 5. Quick start
-
-```bash
-python3 capacitor_fem_graded_tol.py
-```
 
 Expected console output order:
 
@@ -204,7 +157,6 @@ mesh = Mesh(xs=xs, ys=ys)
 | Main README item                         | Status in this file                         |
 | ---------------------------------------- | ------------------------------------------- |
 | §11 Graded structured mesh               | **Implemented**                             |
-| §10.4 Tolerance-based classification     | **Implemented**                             |
 | §10.3 Cut-cell / area-fraction weighting | Not present (still future work)             |
 | Unstructured / conforming mesh           | Not present (would add a native dependency) |
 
