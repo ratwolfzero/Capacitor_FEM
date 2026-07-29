@@ -180,7 +180,7 @@ class PlotConfig:
     dpi: int = 140
     potential_fill_levels: int = 25
     potential_line_levels: int = 15
-    streamline_density: float = 1.9
+    streamline_density: float = 1.5
     # log-scale color vmin, as a fraction of vmax
     energy_density_floor: float = 1e-4
     conductor_fill_color: str = "dimgray"
