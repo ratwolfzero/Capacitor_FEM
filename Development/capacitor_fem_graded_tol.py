@@ -185,7 +185,7 @@ class PlotConfig:
     dpi: int = 140
     potential_fill_levels: int = 25
     potential_line_levels: int = 15
-    streamline_density: float = 1.1
+    streamline_density: float = 1.9
     energy_density_floor: float = 1e-4    # log-scale color vmin, as a fraction of vmax
     conductor_fill_color: str = "dimgray"
     conductor_outline_color: str = "black"
@@ -973,28 +973,68 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     outline(ax)
     ax.set_title("Equipotential contours")
 
-    # --- panel 3: field magnitude + streamlines -----------------------------
+        # --- panel 3: field magnitude + streamlines -----------------------------
     ax = axes[1, 0]
     pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
-    
-    # streamplot requires evenly spaced data. Interpolate if the mesh is graded.
-    dxs, dys = np.diff(xs), np.diff(ys)
-    is_uniform = np.allclose(dxs, dxs[0]) and np.allclose(dys, dys[0])
-    
-    if is_uniform:
-        xs_sp, ys_sp = xs, ys
-        Ex_sp, Ey_sp = ExG, EyG
-    else:
-        xs_sp = np.linspace(xs[0], xs[-1], len(xs))
-        ys_sp = np.linspace(ys[0], ys[-1], len(ys))
-        spline_ex = interp.RectBivariateSpline(ys, xs, ExG)
-        spline_ey = interp.RectBivariateSpline(ys, xs, EyG)
-        Ex_sp = spline_ex(ys_sp, xs_sp)
-        Ey_sp = spline_ey(ys_sp, xs_sp)
 
-    ax.streamplot(xs_sp, ys_sp, Ex_sp, Ey_sp, color="white",
-                  density=style.streamline_density, linewidth=0.6, arrowsize=0.8, minlength=0.01)
+    # Zero the nodal field inside conductors so streamlines terminate
+    # cleanly at the electrode surface (np.gradient leaves small residuals
+    # on Dirichlet nodes).
+    ExG_plot = np.where(cond_grid, 0.0, ExG)
+    EyG_plot = np.where(cond_grid, 0.0, EyG)
+
+    # streamplot requires equally-spaced coordinates.  On a graded mesh
+    # we therefore interpolate the (already zeroed) nodal field onto a
+    # temporary uniform grid that covers the same bounding box; on a
+    # uniform mesh we can feed the original arrays directly.
+    dx = np.diff(xs)
+    dy = np.diff(ys)
+    is_graded = (np.ptp(dx) > 1e-12 * max(1.0, np.mean(dx)) or
+                 np.ptp(dy) > 1e-12 * max(1.0, np.mean(dy)))
+
+    if is_graded:
+        # denser than the coarsest cell, coarser than the finest cell
+        n_plot_x = max(nx, int(round((xs[-1] - xs[0]) / np.min(dx))) + 1)
+        n_plot_y = max(ny, int(round((ys[-1] - ys[0]) / np.min(dy))) + 1)
+        # keep the temporary grid modest so streamplot stays fast
+        n_plot_x = min(n_plot_x, 400)
+        n_plot_y = min(n_plot_y, 400)
+
+        xs_u = np.linspace(xs[0], xs[-1], n_plot_x)
+        ys_u = np.linspace(ys[0], ys[-1], n_plot_y)
+        Xu, Yu = np.meshgrid(xs_u, ys_u)
+
+        # RegularGridInterpolator needs the original (possibly graded)
+        # coordinate vectors; it handles non-uniform spacing correctly.
+        from scipy.interpolate import RegularGridInterpolator
+        interp_Ex = RegularGridInterpolator(
+            (ys, xs), ExG_plot, bounds_error=False, fill_value=0.0)
+        interp_Ey = RegularGridInterpolator(
+            (ys, xs), EyG_plot, bounds_error=False, fill_value=0.0)
+        # points must be (..., 2) with order (y, x) matching the interpolator
+        pts = np.column_stack([Yu.ravel(), Xu.ravel()])
+        Ex_u = interp_Ex(pts).reshape(Yu.shape)
+        Ey_u = interp_Ey(pts).reshape(Yu.shape)
+
+        # re-apply the conductor mask on the uniform grid so streamlines
+        # still stop at the electrode surfaces
+        cond_u = np.zeros_like(Xu, dtype=bool)
+        for cond in conductors:
+            cond_u |= cond.contains(Xu, Yu)
+        Ex_u = np.where(cond_u, 0.0, Ex_u)
+        Ey_u = np.where(cond_u, 0.0, Ey_u)
+
+        ax.streamplot(xs_u, ys_u, Ex_u, Ey_u,
+                      color="white",
+                      density=style.streamline_density,
+                      linewidth=0.6, arrowsize=0.8, minlength=0.01)
+    else:
+        ax.streamplot(xs, ys, ExG_plot, EyG_plot,
+                      color="white",
+                      density=style.streamline_density,
+                      linewidth=0.6, arrowsize=0.8, minlength=0.01)
+
     outline(ax)
     ax.set_title("Electric field + field lines")
 
