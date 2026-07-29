@@ -180,7 +180,7 @@ class PlotConfig:
     dpi: int = 140
     potential_fill_levels: int = 25
     potential_line_levels: int = 15
-    streamline_density: float = 1.1
+    streamline_density: float = 1.9
     # log-scale color vmin, as a fraction of vmax
     energy_density_floor: float = 1e-4
     conductor_fill_color: str = "dimgray"
@@ -894,12 +894,23 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     outline(ax)
     ax.set_title("Equipotential contours")
 
-    # --- panel 3: field magnitude + streamlines -----------------------------
+        # --- panel 3: field magnitude + streamlines -----------------------------
     ax = axes[1, 0]
     pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
-    ax.streamplot(xs, ys, ExG, EyG, color="white",
-                  density=style.streamline_density, linewidth=0.6, arrowsize=0.8, minlength=0.01)
+
+    # Zero the nodal field inside conductors so streamlines terminate
+    # cleanly at the electrode surface instead of integrating a few cells
+    # into the metal (np.gradient produces small residuals on the
+    # Dirichlet nodes).  EmagG_masked is already masked for the colour
+    # plot; the vector field itself must be zeroed for streamplot.
+    ExG_plot = np.where(cond_grid, 0.0, ExG)
+    EyG_plot = np.where(cond_grid, 0.0, EyG)
+
+    ax.streamplot(xs, ys, ExG_plot, EyG_plot,
+                  color="white",
+                  density=style.streamline_density,
+                  linewidth=0.6, arrowsize=0.8, minlength=0.01)
     outline(ax)
     ax.set_title("Electric field + field lines")
 
