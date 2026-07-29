@@ -894,7 +894,7 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     outline(ax)
     ax.set_title("Equipotential contours")
 
-        # --- panel 3: field magnitude + streamlines -----------------------------
+    # --- panel 3: field magnitude + streamlines -----------------------------
     ax = axes[1, 0]
     pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
