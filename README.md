@@ -772,6 +772,27 @@ boundaries, where it is a small (§8.3), measured source of mesh-dependence — 
 where refining the *material* sampling doesn't help, since the conductor
 boundary's own node classification dominates.
 
+**10.4 — Floating-point boundary classification (mitigated).**
+This used to be a live failure mode and is retained here only as a
+historical note. Two arithmetically equivalent ways of computing the
+“same” boundary coordinate (for example a value produced by
+`snap_to_grid` versus the corresponding node from `np.linspace`) can
+differ by a few units in the last place (~10⁻¹⁸ to 10⁻¹⁵ m at the length
+scales used here). A strict `<=` / `>=` comparison then silently excluded
+an entire row or column of nodes that should have been part of a
+conductor or material region; the effect was observed in practice and
+changed reported capacitance by several percent. It is independent of
+mesh resolution. The issue is now mitigated by a small absolute
+tolerance (`_BOUNDARY_TOL` / `BOUNDARY_TOLERANCE_M` = 1e-9 m) applied in
+every primitive `contains()`: the tolerance is many orders of magnitude
+larger than the observed noise yet still far smaller than the finest
+grid spacing (75 µm), so it can only rescue a node that floating-point
+arithmetic nudged off its intended position; it cannot reach a
+neighbouring grid point. With the tolerance in place the classification
+is stable. The residual geometric effect of `snap_to_grid` itself (when
+a target length does not divide evenly into *h*) remains and is
+documented separately in §4.3 and §8.2.
+
 ## 11. Future Work
 
 Ordered roughly by leverage (how much of §10 it addresses) against cost (new
