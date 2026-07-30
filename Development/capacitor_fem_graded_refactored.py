@@ -907,15 +907,16 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     n_diel = max(tune.min_gap_points // 2, round(n_gap * frac))
     n_air = max(tune.min_gap_points // 2, n_gap - n_diel + 1)
 
-    ys = build_graded_coords([
-        (0.0,                   d["margin"],                    n_margin_y),
-        (d["margin"],           d["y_gap_lo"],                  n_plate),
-        (d["y_gap_lo"],         y_diel,                         n_diel),   # glass
-        (y_diel,                d["y_gap_hi"],
-         n_air),    # air
-        (d["y_gap_hi"],         d["y_gap_hi"] + d["plate_t"],   n_plate),
-        (d["y_gap_hi"] + d["plate_t"], d["Ly"],                 n_margin_y),
-    ])
+    ys = build_graded_coords(
+        [
+            (0.0, d["margin"], n_margin_y),
+            (d["margin"], d["y_gap_lo"], n_plate),
+            (d["y_gap_lo"], y_diel, n_diel),  # glass
+            (y_diel, d["y_gap_hi"], n_air),  # air
+            (d["y_gap_hi"], d["y_gap_hi"] + d["plate_t"], n_plate),
+            (d["y_gap_hi"] + d["plate_t"], d["Ly"], n_margin_y),
+        ]
+    )
 
     return Mesh(xs=xs, ys=ys)
 
