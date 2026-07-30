@@ -755,7 +755,8 @@ boundaries are approximated by a staircase of grid cells with $O(h)$
 approximation error. Directly measured in §8.2's coax table: error shrinks
 steadily from −2.76% to −0.75% as $h$ goes from 0.3 mm to 0.075 mm.
 
-![Staircase Boundary](staircase_boundary.png)
+![Staircase approximation of a circle](staircase_boundary.png)
+*Figure: Staircasing of a circular boundary on a Cartesian mesh. The orange circle is the true geometry; the dark outline is what the solver actually sees.*
 
 **10.2 — Corner singularities are under-resolved by a uniform mesh.** The field
 concentrates sharply at a conductor's sharp corner, and a uniform mesh spends
