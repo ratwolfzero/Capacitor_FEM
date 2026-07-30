@@ -2,8 +2,7 @@
 
 This document describes **only** the differences between the original
 `capacitor_fem.py` (uniform Cartesian mesh) and the refactored variant
-`capacitor_fem_graded_tol.py` (also referred to as
-`capacitor_fem_graded_refactored.py` in some checkouts).
+`capacitor_fem_graded_refactored.py`.
 
 It does **not** repeat the physics, weak-form derivation, assembly details,
 validation tables, or usage examples already covered in the main README.md.
