@@ -1,4 +1,4 @@
-# capacitor_fem_graded_tol.py — Delta README
+# capacitor_fem_graded.py — Delta README
 
 This document describes **only** the differences between the original
 `capacitor_fem.py` (uniform Cartesian mesh) and the refactored variant
