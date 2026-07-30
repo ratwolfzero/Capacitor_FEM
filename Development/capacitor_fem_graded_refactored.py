@@ -1,5 +1,5 @@
 """
-capacitor_fem_graded_tol.py  (refactored)
+capacitor_fem_graded.py (refactored)
 =========================================
 
 A two-dimensional finite-element electrostatics solver for simulating
