@@ -59,7 +59,7 @@ RUN_EXACT_CHECK: bool = False
 RUN_GRADED_COMPARISON: bool = True
 """For the parallel-plate example, also solve on a graded mesh and report ΔC."""
 
-SAVE_FIGURES: bool = False
+SAVE_FIGURES: bool = True
 """Write PNG files to OUTPUT_DIR."""
 
 SHOW_PLOTS: bool = True
@@ -175,7 +175,7 @@ class ParallelPlateConfig(_AutoSpacingConfig):
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5
     background_eps_r: float = 1.0
-    mesh_spacing: float = 0.1e-3
+    mesh_spacing: float = 0.05e-3
     convergence_spacings: tuple = (0.4e-3, 0.2e-3, 0.15e-3, 0.1e-3)
     plot_margin: float = 8e-3
 
