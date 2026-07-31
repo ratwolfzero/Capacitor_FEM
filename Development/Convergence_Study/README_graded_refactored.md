@@ -11,16 +11,16 @@ validation tables, or usage examples already covered in the main README.md.
 
 ## 1. Summary of changes
 
-| Feature                    | Original                          | This variant                                              |
-| -------------------------- | --------------------------------- | --------------------------------------------------------- |
-| **Mesh (major)**           | Uniform Cartesian only            | Uniform **or** piecewise-uniform (graded) Cartesian       |
-| **Startup check (major)**  | None                              | Optional §10.4 floating-point boundary-tolerance stress test |
-| **Convergence figure**     | Console tables only               | Optional combined two-panel plot (`plot_convergence_study`) |
-| Structure / tunables       | Literals scattered through the file | Central §0 “Tunable Runtime Parameters” block           |
-| Config inheritance         | Duplicated `__post_init__` logic  | Shared `_AutoSpacingConfig` base class                    |
-| Example helpers            | Monolithic `_solve_*` bodies      | Split geometry / mesh / print helpers                     |
-| Plot / I/O defaults        | Always save; no interactive show  | Opt-in save, opt-in `plt.show()`, quieter notes           |
-| Dependencies               | numpy, scipy, matplotlib          | **unchanged** (still zero native deps)                    |
+| Feature                   | Original                            | This variant                                                 |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| **Mesh (major)**          | Uniform Cartesian only              | Uniform **or** piecewise-uniform (graded) Cartesian          |
+| **Startup check (major)** | None                                | Optional §10.4 floating-point boundary-tolerance stress test |
+| **Convergence figure**    | Console tables only                 | Optional combined two-panel plot (`plot_convergence_study`)  |
+| Structure / tunables      | Literals scattered through the file | Central §0 “Tunable Runtime Parameters” block                |
+| Config inheritance        | Duplicated `__post_init__` logic    | Shared `_AutoSpacingConfig` base class                       |
+| Example helpers           | Monolithic `_solve_*` bodies        | Split geometry / mesh / print helpers                        |
+| Plot / I/O defaults       | Always save; no interactive show    | Opt-in save, opt-in `plt.show()`, quieter notes              |
+| Dependencies              | numpy, scipy, matplotlib            | **unchanged** (still zero native deps)                       |
 
 The **major** functional additions are the graded Cartesian mesh, the
 boundary-tolerance stress test, and the optional combined convergence figure.
@@ -185,12 +185,12 @@ error [%] on the right.
 
 #### Left panel — Parallel-plate (partial dielectric slab)
 
-| Series | Colour | Marker / style | Axis | Meaning |
-| ------ | ------ | -------------- | ---- | ------- |
-| FEM (uniform) | blue | circles, solid | left (C) | Capacitance from the energy method on the uniform mesh at each \(h\) in `convergence_spacings` |
-| Ideal (no fringing) | red | squares, dashed | left (C) | Series-dielectric formula \(C' = \varepsilon_0 w / (d_1/\varepsilon_{r1} + d_2/\varepsilon_{r2})\), evaluated with the **snapped** gap and dielectric thickness at that \(h\) |
-| FEM (graded) | orange | star | left (C) | Single production-resolution solve on the graded mesh (only if `RUN_GRADED_COMPARISON`) |
-| (FEM − ideal) / ideal | green | triangles | **right** (%) | Relative difference \(100\cdot(C_\text{FEM}-C_\text{ideal})/C_\text{ideal}\) |
+| Series                | Colour | Marker / style  | Axis          | Meaning                                                                                                                                                                       |
+| --------------------- | ------ | --------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FEM (uniform)         | blue   | circles, solid  | left (C)      | Capacitance from the energy method on the uniform mesh at each \(h\) in `convergence_spacings`                                                                                |
+| Ideal (no fringing)   | red    | squares, dashed | left (C)      | Series-dielectric formula \(C' = \varepsilon_0 w / (d_1/\varepsilon_{r1} + d_2/\varepsilon_{r2})\), evaluated with the **snapped** gap and dielectric thickness at that \(h\) |
+| FEM (graded)          | orange | star            | left (C)      | Single production-resolution solve on the graded mesh (only if `RUN_GRADED_COMPARISON`)                                                                                       |
+| (FEM − ideal) / ideal | green  | triangles       | **right** (%) | Relative difference \(100\cdot(C_\text{FEM}-C_\text{ideal})/C_\text{ideal}\)                                                                                                  |
 
 **How to read the green curve.** It is **not** pure discretisation or
 staircase error. The plates are finite, so the FEM result lies above the
@@ -203,11 +203,11 @@ README §8.2).
 
 #### Right panel — Coaxial cable (polyethylene fill)
 
-| Series | Colour | Marker / style | Axis | Meaning |
-| ------ | ------ | -------------- | ---- | ------- |
-| FEM | blue | circles, solid | left (C) | Capacitance from the energy method at each \(h\) |
-| Analytical \(2\pi\varepsilon/\ln(b/a)\) | red | horizontal dashed line | left (C) | Exact coax formula; constant because radii are **not** snapped |
-| Staircase / mesh error | green | triangles | **right** (%) | Relative error \(100\cdot(C_\text{FEM}-C_\text{analytical})/C_\text{analytical}\) |
+| Series                                  | Colour | Marker / style         | Axis          | Meaning                                                                           |
+| --------------------------------------- | ------ | ---------------------- | ------------- | --------------------------------------------------------------------------------- |
+| FEM                                     | blue   | circles, solid         | left (C)      | Capacitance from the energy method at each \(h\)                                  |
+| Analytical \(2\pi\varepsilon/\ln(b/a)\) | red    | horizontal dashed line | left (C)      | Exact coax formula; constant because radii are **not** snapped                    |
+| Staircase / mesh error                  | green  | triangles              | **right** (%) | Relative error \(100\cdot(C_\text{FEM}-C_\text{analytical})/C_\text{analytical}\) |
 
 **How to read the green curve.** Here the analytical formula *is* the
 exact solution of the continuous problem for true circular boundaries.
@@ -247,19 +247,19 @@ runtime switches.
 Every behavioural switch, path, tolerance, and heuristic multiplier is
 declared at the top of the file:
 
-| Switch / constant              | Default (refactored) | Role |
-| ------------------------------ | -------------------- | ---- |
-| `RUN_BOUNDARY_STRESS_TEST`     | `False`              | Run §10.4 stress test on startup |
-| `RUN_EXACT_CHECK`              | `False`              | Run machine-precision exact-solution validation |
-| `RUN_GRADED_COMPARISON`        | `True`               | Also solve parallel-plate on a graded mesh and report ΔC |
-| `PLOT_CONVERGENCE`             | `True`               | Draw the combined two-panel convergence figure after both examples |
-| `SAVE_FIGURES`                 | `False`              | Write PNGs to `OUTPUT_DIR` |
-| `SHOW_PLOTS`                   | `True`               | Call `plt.show()` after each figure |
-| `VERBOSE_CONVERGENCE_NOTES`    | `False`              | Print the long explanatory notes after convergence tables |
-| `OUTPUT_DIR`                   | `"Development"`      | Directory for output figures |
-| `BOUNDARY_TOLERANCE_M`         | `1e-9`               | Absolute tolerance [m] for `Shape.contains()` |
-| Memory-estimate coefficients   | same as original     | Peak-RSS power-law heuristics |
-| `GRADED_MESH_DEFAULTS`         | `GradedMeshTuning()` | All graded-mesh spacing / band knobs |
+| Switch / constant            | Default (refactored) | Role                                                               |
+| ---------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `RUN_BOUNDARY_STRESS_TEST`   | `False`              | Run §10.4 stress test on startup                                   |
+| `RUN_EXACT_CHECK`            | `False`              | Run machine-precision exact-solution validation                    |
+| `RUN_GRADED_COMPARISON`      | `True`               | Also solve parallel-plate on a graded mesh and report ΔC           |
+| `PLOT_CONVERGENCE`           | `True`               | Draw the combined two-panel convergence figure after both examples |
+| `SAVE_FIGURES`               | `False`              | Write PNGs to `OUTPUT_DIR`                                         |
+| `SHOW_PLOTS`                 | `True`               | Call `plt.show()` after each figure                                |
+| `VERBOSE_CONVERGENCE_NOTES`  | `False`              | Print the long explanatory notes after convergence tables          |
+| `OUTPUT_DIR`                 | `"Development"`      | Directory for output figures                                       |
+| `BOUNDARY_TOLERANCE_M`       | `1e-9`               | Absolute tolerance [m] for `Shape.contains()`                      |
+| Memory-estimate coefficients | same as original     | Peak-RSS power-law heuristics                                      |
+| `GRADED_MESH_DEFAULTS`       | `GradedMeshTuning()` | All graded-mesh spacing / band knobs                               |
 
 In the original script the corresponding values were either hard-coded
 literals or a single `RUN_EXACT_CHECK = True` near the bottom.
@@ -286,14 +286,14 @@ The coax and exact-check paths are structurally the same as the original
 
 ### 5.4 Plot / I/O defaults
 
-| Item                    | Original      | Refactored                          |
-| ----------------------- | ------------- | ----------------------------------- |
-| `streamline_density`    | `1.5`         | `1.9`                               |
-| Figure save             | Always        | Only if `SAVE_FIGURES`              |
-| Interactive display     | Never         | If `SHOW_PLOTS`                     |
-| Long convergence notes  | Always printed| If `VERBOSE_CONVERGENCE_NOTES`      |
-| Convergence figure      | None          | If `PLOT_CONVERGENCE`               |
-| Default `OUTPUT_DIR`    | `""` (cwd)    | `"Development"`                     |
+| Item                   | Original       | Refactored                     |
+| ---------------------- | -------------- | ------------------------------ |
+| `streamline_density`   | `1.5`          | `1.9`                          |
+| Figure save            | Always         | Only if `SAVE_FIGURES`         |
+| Interactive display    | Never          | If `SHOW_PLOTS`                |
+| Long convergence notes | Always printed | If `VERBOSE_CONVERGENCE_NOTES` |
+| Convergence figure     | None           | If `PLOT_CONVERGENCE`          |
+| Default `OUTPUT_DIR`   | `""` (cwd)     | `"Development"`                |
 
 On a graded mesh the streamline panel additionally interpolates onto a
 temporary uniform grid (see §2); colour maps and energy density still use
@@ -344,14 +344,14 @@ the longer original startup sequence. Figures are written only when
 
 ## 8. Relationship to the main README roadmap
 
-| Main README item                         | Status in this file                         |
-| ---------------------------------------- | ------------------------------------------- |
-| §11 Graded structured mesh               | **Implemented**                             |
-| §10.4 Boundary-tolerance hardening       | **Implemented** (named constant + optional stress test) |
-| §10.3 Cut-cell / area-fraction weighting | Not present (still future work)             |
-| Unstructured / conforming mesh           | Not present (would add a native dependency) |
-| Symmetry-aware / iterative solvers       | Not present (still future work)             |
-| Nonlinear / anisotropic / floating BC / 3-D | Not present (still future work)          |
+| Main README item                            | Status in this file                                     |
+| ------------------------------------------- | ------------------------------------------------------- |
+| §11 Graded structured mesh                  | **Implemented**                                         |
+| §10.4 Boundary-tolerance hardening          | **Implemented** (named constant + optional stress test) |
+| §10.3 Cut-cell / area-fraction weighting    | Not present (still future work)                         |
+| Unstructured / conforming mesh              | Not present (would add a native dependency)             |
+| Symmetry-aware / iterative solvers          | Not present (still future work)                         |
+| Nonlinear / anisotropic / floating BC / 3-D | Not present (still future work)                         |
 
 This variant stays strictly inside the original “one file, zero native
 dependencies” constraint.
