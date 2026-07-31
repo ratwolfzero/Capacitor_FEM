@@ -68,6 +68,11 @@ SHOW_PLOTS: bool = True
 VERBOSE_CONVERGENCE_NOTES: bool = False
 """Print the long explanatory notes after convergence tables."""
 
+PLOT_CONVERGENCE: bool = True
+"""After both examples, draw a combined convergence figure (parallel-plate +
+coax) with ideal/analytical references and relative error vs the reference
+computed from the active parameter settings."""
+
 # --- I/O ----------------------------------------------------------------------
 OUTPUT_DIR: str = "Development"
 """Directory for output figures.  Empty string → current working directory."""
@@ -790,6 +795,104 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     plt.close(fig)
 
 
+def plot_convergence_study(pp_results, coax_results, graded_result=None,
+                           fname=None, style=None):
+    """Combined convergence figure for both worked examples.
+
+    One figure, two panels:
+
+    * Left  – parallel-plate: FEM C(h), ideal (fringing-free) reference
+              recomputed from the snapped geometry at each h, relative
+              difference vs that ideal, and optional graded-mesh marker.
+    * Right – coax: FEM C(h), analytical 2πϵ/ln(b/a) reference (constant),
+              and relative error (staircase / mesh discretisation error).
+
+    All reference values are taken from the result dicts themselves, so they
+    track whatever ParallelPlateConfig / CoaxConfig was used for the sweep.
+    """
+    style = style or PlotConfig()
+    fname = fname or os.path.join(OUTPUT_DIR, "convergence_study.png")
+
+    fig, (ax_pp, ax_cx) = plt.subplots(1, 2, figsize=(12.5, 5.2))
+    fig.suptitle("Mesh convergence study", fontsize=14, fontweight="bold")
+
+    # ----- Parallel plate ---------------------------------------------------
+    h_pp = np.array([r["h"] for r in pp_results]) * 1e3          # mm
+    C_pp = np.array([r["C"] for r in pp_results]) * 1e12         # pF/m
+    C_id = np.array([r["C_ideal"] for r in pp_results]) * 1e12   # pF/m
+    err_pp = 100.0 * (C_pp - C_id) / C_id
+
+    color_fem = "#1f77b4"
+    color_ref = "#d62728"
+    color_err = "#2ca02c"
+    color_grd = "#ff7f0e"
+
+    ax_pp.plot(h_pp, C_pp, "o-", color=color_fem, lw=1.8, ms=7,
+               label="FEM (uniform)")
+    ax_pp.plot(h_pp, C_id, "s--", color=color_ref, lw=1.4, ms=5,
+               label="Ideal (no fringing)")
+    if graded_result is not None:
+        ax_pp.plot(graded_result["h"] * 1e3, graded_result["C"] * 1e12,
+                   "*", color=color_grd, ms=14, zorder=5,
+                   label="FEM (graded)")
+
+    ax_pp.set_xlabel("h [mm]")
+    ax_pp.set_ylabel("C [pF/m]", color=color_fem)
+    ax_pp.tick_params(axis="y", labelcolor=color_fem)
+    ax_pp.invert_xaxis()
+    ax_pp.grid(True, alpha=0.3)
+    ax_pp.set_title("Parallel-plate (partial dielectric slab)")
+
+    ax_pp2 = ax_pp.twinx()
+    ax_pp2.plot(h_pp, err_pp, "^-", color=color_err, lw=1.2, ms=6, alpha=0.85,
+                label="(FEM − ideal) / ideal")
+    ax_pp2.set_ylabel("Relative difference [%]", color=color_err)
+    ax_pp2.tick_params(axis="y", labelcolor=color_err)
+    ax_pp2.axhline(0.0, color=color_err, ls=":", lw=0.8, alpha=0.5)
+
+    lines1, labels1 = ax_pp.get_legend_handles_labels()
+    lines2, labels2 = ax_pp2.get_legend_handles_labels()
+    ax_pp.legend(lines1 + lines2, labels1 + labels2, loc="best", fontsize=8)
+
+    # ----- Coax -------------------------------------------------------------
+    h_cx = np.array([r["h"] for r in coax_results]) * 1e3
+    C_cx = np.array([r["C"] for r in coax_results]) * 1e12
+    C_an = np.array([r["C_ideal"] for r in coax_results]) * 1e12
+    err_cx = 100.0 * (C_cx - C_an) / C_an
+
+    ax_cx.plot(h_cx, C_cx, "o-", color=color_fem, lw=1.8, ms=8, label="FEM")
+    ax_cx.axhline(C_an[0], color=color_ref, ls="--", lw=1.4,
+                  label=r"Analytical $2\pi\varepsilon/\ln(b/a)$")
+
+    ax_cx.set_xlabel("h [mm]")
+    ax_cx.set_ylabel("C [pF/m]", color=color_fem)
+    ax_cx.tick_params(axis="y", labelcolor=color_fem)
+    ax_cx.invert_xaxis()
+    ax_cx.grid(True, alpha=0.3)
+    ax_cx.set_title("Coaxial cable (polyethylene fill)")
+
+    ax_cx2 = ax_cx.twinx()
+    ax_cx2.plot(h_cx, err_cx, "^-", color=color_err, lw=1.2, ms=4, alpha=0.85,
+                label="Staircase / mesh error")
+    ax_cx2.set_ylabel("Relative error [%]", color=color_err)
+    ax_cx2.tick_params(axis="y", labelcolor=color_err)
+    ax_cx2.axhline(0.0, color=color_err, ls=":", lw=0.8, alpha=0.5)
+
+    lines1, labels1 = ax_cx.get_legend_handles_labels()
+    lines2, labels2 = ax_cx2.get_legend_handles_labels()
+    ax_cx.legend(lines1 + lines2, labels1 + labels2, loc="best", fontsize=8)
+
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+
+    if SAVE_FIGURES:
+        os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
+        fig.savefig(fname, dpi=style.dpi)
+        print(f"Convergence figure saved to {fname}")
+    if SHOW_PLOTS:
+        plt.show()
+    plt.close(fig)
+
+
 # =============================================================================
 # 10. EXAMPLES & ORCHESTRATION
 # =============================================================================
@@ -1041,7 +1144,7 @@ def example_parallel_plate(config=None):
                       ylim=(graded["margin"] - config.plot_margin,
                             graded["margin"] + config.plot_margin
                             + 2 * graded["plate_t"] + graded["gap"]))
-        return C_graded, C_ideal
+        return C_graded, C_ideal, results, graded
 
     # If graded comparison is disabled, plot the uniform result instead
     plot_solution(uniform["mesh"], uniform["V"], uniform["eps_r_of_xy"],
@@ -1053,7 +1156,7 @@ def example_parallel_plate(config=None):
                   ylim=(uniform["margin"] - config.plot_margin,
                         uniform["margin"] + config.plot_margin
                         + 2 * uniform["plate_t"] + uniform["gap"]))
-    return C_uniform, C_ideal
+    return C_uniform, C_ideal, results, None
 
 
 def _solve_coax(config, h):
@@ -1131,7 +1234,7 @@ def example_coax(config=None):
                   result["energy_density"], result["conductors"], result["is_fixed"],
                   "Coaxial capacitor (polyethylene dielectric)",
                   os.path.join(OUTPUT_DIR, "example2_coax.png"))
-    return C, C_ideal
+    return C, C_ideal, results
 
 
 def _solve_exact_check(config, h):
@@ -1276,8 +1379,10 @@ def print_summary(C1, C1_ideal, C2, C2_ideal, elapsed):
     print(f"{'Coax (polyethylene)':32s}{C2*1e12:16.3f}{C2_ideal*1e12:20.3f}")
     print()
     print(f"total runtime: {elapsed:.2f} s")
-    print(f"Figures saved to {OUTPUT_DIR}/example1_parallel_plate.png and "
-          f"{OUTPUT_DIR}/example2_coax.png")
+    if SAVE_FIGURES:
+        print(f"Figures written under {OUTPUT_DIR}/ "
+              f"(example1_parallel_plate.png, example2_coax.png"
+              f"{', convergence_study.png' if PLOT_CONVERGENCE else ''})")
 
 
 # =============================================================================
@@ -1294,7 +1399,11 @@ if __name__ == "__main__":
         example_exact_check()
         print()
 
-    C1, C1_ideal = example_parallel_plate()
-    C2, C2_ideal = example_coax()
+    C1, C1_ideal, pp_results, graded_result = example_parallel_plate()
+    C2, C2_ideal, coax_results = example_coax()
+
+    if PLOT_CONVERGENCE:
+        plot_convergence_study(pp_results, coax_results,
+                               graded_result=graded_result)
 
     print_summary(C1, C1_ideal, C2, C2_ideal, time.time() - t_start)
