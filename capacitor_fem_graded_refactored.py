@@ -74,7 +74,7 @@ coax) with ideal/analytical references and relative error vs the reference
 computed from the active parameter settings."""
 
 # --- I/O ----------------------------------------------------------------------
-OUTPUT_DIR: str = "Development"
+OUTPUT_DIR: str = ""
 """Directory for output figures.  Empty string → current working directory."""
 
 # --- Numerical tolerances -----------------------------------------------------
