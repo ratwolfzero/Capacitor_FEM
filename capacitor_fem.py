@@ -678,6 +678,20 @@ def _project_element_field_to_nodes(mesh, values):
     return nodal / counts
 
 
+def _show_blocking_figure(fig, message=None):
+    """Display a figure and wait for the user to close it."""
+    if not SHOW_PLOTS:
+        plt.close(fig)
+        return
+
+    if message:
+        print(message)
+
+    fig.canvas.draw_idle()
+    plt.show(block=True)
+    plt.close(fig)
+
+
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
                   title, fname, xlim=None, ylim=None, style=None,
                   Ex=None, Ey=None):
@@ -817,11 +831,11 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     if SAVE_FIGURES:
         os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
         fig.savefig(fname, dpi=style.dpi)
-    if SHOW_PLOTS:
-        fig.canvas.draw_idle()
-        plt.show()
-    else:
-        plt.close(fig)
+
+    _show_blocking_figure(
+        fig,
+        "Close this plot window to continue to the next figure."
+    )
 
 
 def plot_convergence_study(pp_results, coax_results, graded_result=None,
@@ -917,11 +931,11 @@ def plot_convergence_study(pp_results, coax_results, graded_result=None,
         os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
         fig.savefig(fname, dpi=style.dpi)
         print(f"Convergence figure saved to {fname}")
-    if SHOW_PLOTS:
-        fig.canvas.draw_idle()
-        plt.show()
-    else:
-        plt.close(fig)
+
+    _show_blocking_figure(
+        fig,
+        "Close this convergence plot window to finish."
+    )
 
 
 # =============================================================================
