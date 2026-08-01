@@ -59,7 +59,7 @@ RUN_EXACT_CHECK: bool = False
 RUN_GRADED_COMPARISON: bool = True
 """For the parallel-plate example, also solve on a graded mesh and report ΔC."""
 
-SAVE_FIGURES: bool = True
+SAVE_FIGURES: bool = False
 """Write PNG files to OUTPUT_DIR."""
 
 SHOW_PLOTS: bool = True
