@@ -166,11 +166,17 @@ class _AutoSpacingConfig:
 
 @dataclass(frozen=True)
 class ParallelPlateConfig(_AutoSpacingConfig):
-    """Parameters for the parallel-plate capacitor example."""
+    """Parameters for the parallel-plate capacitor example.
+
+    bottom_plate_width / top_plate_width may differ (plates are centered in
+    the domain).  Defaults keep both equal (classical symmetric capacitor);
+    set top_plate_width smaller to study overhang / asymmetric fringing.
+    """
     plate_thickness: float = 1e-3
     gap: float = 4e-3
     dielectric_thickness: float = 2e-3
-    plate_width: float = 24e-3
+    bottom_plate_width: float = 24e-3
+    top_plate_width: float = 24e-3
     domain_margin: float = 15e-3
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5
@@ -914,7 +920,9 @@ def _grid_alignment_note(config, h):
     directly set the capacitor's physics.  Returns 'clean' or a note."""
     checks = [("gap", config.gap),
               ("dielectric_thickness", config.dielectric_thickness),
-              ("plate_thickness", config.plate_thickness)]
+              ("plate_thickness", config.plate_thickness),
+              ("bottom_plate_width", config.bottom_plate_width),
+              ("top_plate_width", config.top_plate_width)]
     notes = []
     for name, target in checks:
         ratio = target / h
@@ -926,71 +934,93 @@ def _grid_alignment_note(config, h):
 
 def _build_parallel_plate_geometry(config, h):
     """Return (conductors, eps_r_of_xy, dims_dict) for the parallel-plate
-    example at grid spacing h.  All sizes are snap_to_grid'd."""
+    example at grid spacing h.  All sizes are snap_to_grid'd.
+
+    Plates may have independent widths; they are centered in the domain
+    so that overhang is symmetric.  The dielectric slab spans the wider
+    plate (covers the full overlapping + overhang region).
+    """
     plate_t = snap_to_grid(config.plate_thickness, h)
     gap = snap_to_grid(config.gap, h)
     dielectric_t = snap_to_grid(config.dielectric_thickness, h)
-    plate_w = snap_to_grid(config.plate_width, h)
+    bottom_w = snap_to_grid(config.bottom_plate_width, h)
+    top_w = snap_to_grid(config.top_plate_width, h)
     margin = snap_to_grid(config.domain_margin, h)
 
-    Lx = plate_w + 2 * margin
+    plate_w_max = max(bottom_w, top_w)
+    Lx = plate_w_max + 2 * margin
     Ly = 2 * plate_t + gap + 2 * margin
-    x_plate0 = margin
+
+    # Center both plates inside the max-width slot
+    x_bottom0 = margin + 0.5 * (plate_w_max - bottom_w)
+    x_top0 = margin + 0.5 * (plate_w_max - top_w)
     y_gap_lo = margin + plate_t
     y_gap_hi = y_gap_lo + gap
 
-    bottom_plate = Rectangle(x_plate0, margin, plate_w, plate_t,
+    bottom_plate = Rectangle(x_bottom0, margin, bottom_w, plate_t,
                              voltage=0.0, name="bottom_plate")
-    top_plate = Rectangle(x_plate0, y_gap_hi, plate_w, plate_t,
+    top_plate = Rectangle(x_top0, y_gap_hi, top_w, plate_t,
                           voltage=config.voltage, name="top_plate")
     conductors = [bottom_plate, top_plate]
 
-    slab = Rectangle(x_plate0, y_gap_lo, plate_w, dielectric_t,
+    # Dielectric under the wider plate (still exact on grid after snap)
+    slab = Rectangle(margin, y_gap_lo, plate_w_max, dielectric_t,
                      eps_r=config.dielectric_eps_r, name="dielectric_slab")
     eps_r_of_xy = make_eps_r_function(
         [slab], background_eps_r=config.background_eps_r)
 
     dims = {
         "plate_t": plate_t, "gap": gap, "dielectric_t": dielectric_t,
-        "plate_w": plate_w, "margin": margin, "Lx": Lx, "Ly": Ly,
-        "x_plate0": x_plate0, "y_gap_lo": y_gap_lo, "y_gap_hi": y_gap_hi,
+        "bottom_w": bottom_w, "top_w": top_w, "plate_w_max": plate_w_max,
+        "margin": margin, "Lx": Lx, "Ly": Ly,
+        "x_bottom0": x_bottom0, "x_top0": x_top0,
+        "y_gap_lo": y_gap_lo, "y_gap_hi": y_gap_hi,
+        # keep legacy key for any leftover consumers / plot xlims
+        "plate_w": plate_w_max, "x_plate0": margin,
     }
     return conductors, eps_r_of_xy, dims
 
 
 def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     """Construct a graded Mesh for the parallel-plate example.
-    All geometry lines that were snap_to_grid'd remain exactly on mesh lines."""
+    All geometry lines that were snap_to_grid'd remain exactly on mesh lines.
+
+    x-grading is driven by the *wider* plate (outermost edges).  When the
+    plates have different widths the shorter plate's edges fall inside the
+    medium-resolution interior zone, which is still finer than the far-field
+    margins.  This keeps the segment logic simple and identical to the
+    equal-width case when bottom_w == top_w.
+    """
     tune = tune or GRADED_MESH_DEFAULTS
     d = dims
 
-    # x-direction: coarse margins → fine edge bands → medium interior
-    edge_band = max(tune.edge_band_width_factor *
-                    h, tune.edge_band_width_min_m)
+    # Use the bounding (max) plate for the classic 5-segment x-layout
+    plate_w = d["plate_w_max"]
+    x_plate0 = d["x_plate0"]  # == margin
+
+    edge_band = max(tune.edge_band_width_factor * h, tune.edge_band_width_min_m)
     n_margin_x = max(tune.min_margin_points,
                      round(d["margin"] / (tune.margin_spacing_factor * h)) + 1)
     n_edge = max(tune.min_edge_points,
                  round(edge_band / (tune.edge_spacing_factor * h)) + 1)
     n_interior = max(tune.min_interior_points,
-                     round((d["plate_w"] - 2 * edge_band) /
+                     round((plate_w - 2 * edge_band) /
                            (tune.interior_spacing_factor * h)) + 1)
 
-    if d["plate_w"] <= 2 * edge_band:
-        edge_band = 0.25 * d["plate_w"]
+    if plate_w <= 2 * edge_band:
+        edge_band = 0.25 * plate_w
         n_edge = max(tune.min_edge_points,
                      round(edge_band / (tune.edge_spacing_factor * h)) + 1)
         n_interior = max(tune.min_fallback_interior_points,
-                         round((d["plate_w"] - 2 * edge_band) /
+                         round((plate_w - 2 * edge_band) /
                                (tune.fallback_interior_spacing_factor * h)) + 1)
 
     xs = build_graded_coords([
-        (0.0, d["x_plate0"], n_margin_x),
-        (d["x_plate0"], d["x_plate0"] + edge_band, n_edge),
-        (d["x_plate0"] + edge_band, d["x_plate0"] +
-         d["plate_w"] - edge_band, n_interior),
-        (d["x_plate0"] + d["plate_w"] - edge_band,
-         d["x_plate0"] + d["plate_w"], n_edge),
-        (d["x_plate0"] + d["plate_w"], d["Lx"], n_margin_x),
+        (0.0, x_plate0, n_margin_x),
+        (x_plate0, x_plate0 + edge_band, n_edge),
+        (x_plate0 + edge_band, x_plate0 + plate_w - edge_band, n_interior),
+        (x_plate0 + plate_w - edge_band, x_plate0 + plate_w, n_edge),
+        (x_plate0 + plate_w, d["Lx"], n_margin_x),
     ])
 
     # y-direction: coarse outer margins → medium plates → fine gap
@@ -1040,7 +1070,9 @@ def _solve_parallel_plate(config, h, use_graded=False):
     Ex, Ey, Emag, Dx, Dy, energy_density, W = compute_fields(
         mesh, V, eps_elem, b, c, area, area2)
     C = capacitance_from_energy(W, config.voltage, 0.0)
-    C_ideal = (d["plate_w"] * EPS0 /
+    # Ideal (fringing-free) formula uses the overlapping width
+    overlap_w = min(d["bottom_w"], d["top_w"])
+    C_ideal = (overlap_w * EPS0 /
                (d["dielectric_t"] / config.dielectric_eps_r +
                 (d["gap"] - d["dielectric_t"]) / config.background_eps_r))
 
@@ -1098,6 +1130,10 @@ def example_parallel_plate(config=None):
     print("=" * 72)
     print("EXAMPLE 1: Parallel-plate capacitor, partially filled with a dielectric slab")
     print("=" * 72)
+    print(f"  bottom plate (0 V): {config.bottom_plate_width*1e3:.1f} mm wide")
+    print(f"  top plate ({config.voltage:g} V): {config.top_plate_width*1e3:.1f} mm wide"
+          f"{'  (shorter → asymmetric fringing)' if config.top_plate_width != config.bottom_plate_width else ''}")
+    print()
 
     print("Mesh convergence (physical geometry fixed, only h changes):")
     results = [_solve_parallel_plate(config, h)
@@ -1244,7 +1280,7 @@ def _solve_exact_check(config, h):
     dielectric_t = snap_to_grid(config.dielectric_thickness, h)
     margin = snap_to_grid(config.domain_margin, h)
 
-    Lx = snap_to_grid(config.plate_width, h)
+    Lx = snap_to_grid(max(config.bottom_plate_width, config.top_plate_width), h)
     Ly = 2 * plate_t + gap + 2 * margin
     nx = round(Lx / h) + 1
     ny = round(Ly / h) + 1

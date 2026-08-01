@@ -14,6 +14,7 @@ validation tables, or usage examples already covered in the main README.md.
 | Feature                   | Original                            | This variant                                                 |
 | ------------------------- | ----------------------------------- | ------------------------------------------------------------ |
 | **Mesh (major)**          | Uniform Cartesian only              | Uniform **or** piecewise-uniform (graded) Cartesian          |
+| **Plate widths (major)**  | Single shared `plate_width`         | Independent `bottom_plate_width` / `top_plate_width`         |
 | **Startup check (major)** | None                                | Optional §10.4 floating-point boundary-tolerance stress test |
 | **Convergence figure**    | Console tables only                 | Optional combined two-panel plot (`plot_convergence_study`)  |
 | Structure / tunables      | Literals scattered through the file | Central §0 “Tunable Runtime Parameters” block                |
@@ -22,11 +23,10 @@ validation tables, or usage examples already covered in the main README.md.
 | Plot / I/O defaults       | Always save; no interactive show    | Opt-in save, opt-in `plt.show()`, quieter notes              |
 | Dependencies              | numpy, scipy, matplotlib            | **unchanged** (still zero native deps)                       |
 
-The **major** functional additions are the graded Cartesian mesh, the
-boundary-tolerance stress test, and the optional combined convergence figure.
-Everything else is structural refactoring or minor default/UI adjustments that
-leave the uniform-mesh physics path bit-compatible with the original when the
-new switches are left at their defaults (or turned off).
+The **major** functional additions are the graded Cartesian mesh, independent
+plate widths for the parallel-plate example, the boundary-tolerance stress
+test, and the optional combined convergence figure. Everything else is
+structural refactoring or minor default/UI adjustments.
 
 ---
 
@@ -135,7 +135,102 @@ mesh = Mesh(xs=xs, ys=ys)
 
 ---
 
-## 3. Major change: §10.4 boundary-tolerance hardening
+## 3. Major change: Independent plate widths
+
+### Motivation / API
+
+The original parallel-plate example used a single shared `plate_width` for
+both conductors.  This variant splits it into two independent fields on
+`ParallelPlateConfig`:
+
+```python
+bottom_plate_width: float = 24e-3   # 0 V plate
+top_plate_width:    float = 24e-3   # 100 V plate  (defaults equal)
+```
+
+**Defaults keep both widths equal** (classical symmetric capacitor, bit-
+compatible with the original when graded comparison is off).  Set
+`top_plate_width` smaller to study overhang / asymmetric fringing.
+
+The plates are **centered** in the domain so that any overhang is symmetric.
+The dielectric slab spans the wider plate.  All sizes continue to pass through
+`snap_to_grid`, so axis-aligned classification stays exact on the mesh.
+
+```python
+# default: equal widths (classical symmetric case)
+C, C_ideal, results, graded = example_parallel_plate()
+
+# shorter top plate → asymmetric fringing
+cfg = ParallelPlateConfig(bottom_plate_width=24e-3, top_plate_width=20e-3)
+C, C_ideal, results, graded = example_parallel_plate(cfg)
+
+# fully custom
+cfg = ParallelPlateConfig(bottom_plate_width=30e-3, top_plate_width=18e-3)
+```
+
+The example header always prints both widths and notes when they differ:
+
+```
+  bottom plate (0 V): 24.0 mm wide
+  top plate (100 V): 24.0 mm wide
+```
+
+or, when unequal:
+
+```
+  bottom plate (0 V): 24.0 mm wide
+  top plate (100 V): 20.0 mm wide  (shorter → asymmetric fringing)
+```
+
+### How to read the fringing delta (FEM vs ideal)
+
+The ideal reference is still the **fringing-free series-dielectric formula**,
+not a true infinite-plate solution:
+
+\[
+C'_{\text{ideal}} = \varepsilon_0\, w_{\text{overlap}} \Big/ \Bigl(\frac{d_1}{\varepsilon_{r1}} + \frac{d_2}{\varepsilon_{r2}}\Bigr)
+\]
+
+where \(w_{\text{overlap}} = \min(w_{\text{bottom}}, w_{\text{top}})\).
+
+It assumes a purely uniform field that exists only under the overlapping
+region and is exactly zero outside.  With equal widths (the shipped default)
+this is identical to the original ideal formula.
+
+The printed / plotted relative difference
+
+```text
+Difference = 100 × (C_FEM − C_ideal) / C_ideal
+```
+
+| Situation | What the delta mainly tells you |
+| --------- | ------------------------------- |
+| `top_plate_width == bottom_plate_width` (shipped default) | Classic finite-plate fringing (original interpretation) |
+| `top_plate_width ≠ bottom_plate_width` | Fringing of the overlap **plus** the contribution of the overhang and any left–right field asymmetry |
+
+When the widths differ, the excess over the ideal is typically a few
+percentage points larger than the equal-width case that uses the same
+overlap width, because the wider plate still supports some field in the
+overhang region.
+
+The ideal remains a useful, well-defined lower bound: it is the capacitance
+you would obtain if the field were forced to be one-dimensional under the
+overlap and zero elsewhere.  The FEM result is always higher, and the
+difference quantifies how much the real two-dimensional field (including
+any overhang) increases the energy.
+
+### Graded-mesh interaction
+
+When the plates have different widths the graded x-layout is still driven by
+the **wider** plate (outermost edges).  The shorter plate’s edges fall inside
+the medium-resolution interior zone, which remains finer than the far-field
+margins.  This keeps the segment construction simple and recovers the
+original five-segment layout exactly when the two widths are equal (the
+default).
+
+---
+
+## 4. Major change: §10.4 boundary-tolerance hardening
 
 ### Named tolerance
 
@@ -156,7 +251,7 @@ refactored defaults). A failure prints a clear diagnostic and returns
 
 ---
 
-## 4. Combined convergence figure (`plot_convergence_study`)
+## 5. Combined convergence figure (`plot_convergence_study`)
 
 ### Purpose
 
@@ -236,13 +331,13 @@ error curves.
 
 ---
 
-## 5. Refactoring subelements (non-physics)
+## 6. Refactoring subelements (non-physics)
 
 These changes do not alter the governing PDE, weak form, assembly, or
 uniform-mesh numerical results. They reorganise the code and expose a few
 runtime switches.
 
-### 5.1 Central tunables block (§0)
+### 6.1 Central tunables block (§0)
 
 Every behavioural switch, path, tolerance, and heuristic multiplier is
 declared at the top of the file:
@@ -264,14 +359,14 @@ declared at the top of the file:
 In the original script the corresponding values were either hard-coded
 literals or a single `RUN_EXACT_CHECK = True` near the bottom.
 
-### 5.2 Shared config base class
+### 6.2 Shared config base class
 
 `ParallelPlateConfig` and `CoaxConfig` both inherit from
 `_AutoSpacingConfig`, which implements the convergence-spacing
 auto-derivation once. Behaviour is identical to the original duplicated
 `__post_init__` logic.
 
-### 5.3 Split example helpers
+### 6.3 Split example helpers
 
 The parallel-plate path is broken into single-purpose helpers:
 
@@ -284,7 +379,7 @@ The parallel-plate path is broken into single-purpose helpers:
 The coax and exact-check paths are structurally the same as the original
 (still uniform-mesh only).
 
-### 5.4 Plot / I/O defaults
+### 6.4 Plot / I/O defaults
 
 | Item                   | Original       | Refactored                     |
 | ---------------------- | -------------- | ------------------------------ |
@@ -299,36 +394,37 @@ On a graded mesh the streamline panel additionally interpolates onto a
 temporary uniform grid (see §2); colour maps and energy density still use
 the native mesh.
 
-### 5.5 What remains bit-compatible
+### 6.5 What remains bit-compatible
 
 When graded comparison and the stress test are left off (or
 `use_graded=False`), the uniform-mesh path produces the same capacitance
 numbers, the same convergence tables, and the same exact-check residuals
-as the original. The governing PDE, weak form, P1 formulas, sparse
-assembly, energy method, `snap_to_grid`, and high-level
-`ElectrostaticProblem` API are unchanged. The convergence figure is pure
-post-processing of those same results.
+as the original (plate widths default to equal 24 mm).  The governing PDE,
+weak form, P1 formulas, sparse assembly, energy method, `snap_to_grid`, and
+high-level `ElectrostaticProblem` API are unchanged.  The convergence figure
+is pure post-processing of those same results.
 
 ---
 
-## 6. What did *not* change (physics & validation)
+## 7. What did *not* change (physics & validation)
 
 - Governing PDE, weak form, P1 element formulas, sparse assembly.
 - `snap_to_grid` behaviour and the grid-alignment notes in the convergence
-  tables.
+  tables (now also report both plate widths).
 - Exact-solution validation (`example_exact_check`) — still machine-precision
-  when enabled.
+  when enabled (uses the wider plate for the full-width domain).
 - Coax example (still uniform mesh).
 - Memory-warning heuristics (same fitted power law).
 - High-level `ElectrostaticProblem` API and four-panel visualisation layout.
 
 ---
 
-## 7. Expected console / figure output (with defaults as shipped)
+## 8. Expected console / figure output (with defaults as shipped)
 
 With the refactored defaults (`RUN_BOUNDARY_STRESS_TEST=False`,
 `RUN_EXACT_CHECK=False`, `RUN_GRADED_COMPARISON=True`,
-`PLOT_CONVERGENCE=True`, `VERBOSE_CONVERGENCE_NOTES=False`):
+`PLOT_CONVERGENCE=True`, `VERBOSE_CONVERGENCE_NOTES=False`,
+equal plate widths):
 
 1. Parallel-plate convergence (uniform) + graded production solve and ΔC
 2. Coax convergence
@@ -342,11 +438,12 @@ the longer original startup sequence. Figures are written only when
 
 ---
 
-## 8. Relationship to the main README roadmap
+## 9. Relationship to the main README roadmap
 
 | Main README item                            | Status in this file                                     |
 | ------------------------------------------- | ------------------------------------------------------- |
 | §11 Graded structured mesh                  | **Implemented**                                         |
+| Independent plate widths                    | **Implemented** (see §3 of this delta README; defaults equal) |
 | §10.4 Boundary-tolerance hardening          | **Implemented** (named constant + optional stress test) |
 | §10.3 Cut-cell / area-fraction weighting    | Not present (still future work)                         |
 | Unstructured / conforming mesh              | Not present (would add a native dependency)             |
