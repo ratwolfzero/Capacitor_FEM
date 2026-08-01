@@ -17,6 +17,49 @@ architecture, and how to use and extend the code. It assumes familiarity with ve
 calculus, linear algebra, and Python, but not with finite elements specifically —
 the derivation starts from Maxwell's equations and builds up.
 
+This repository now uses a single consolidated document for the current implementation,
+the refactoring delta, the known limitations, and the future work. The separate
+graded-refactoring note has been folded into this file so that the current state,
+historical improvements, and remaining gaps are visible together.
+
+## Current implementation status
+
+- The solver now supports a structured triangular mesh with optional graded Cartesian
+  refinement in the parallel-plate example.
+- The parallel-plate example can use independent plate widths and reports a
+  convergence study with optional plots.
+- The refactored version centralizes runtime switches, geometry configuration, and
+  boundary-tolerance handling in one place.
+- The current code remains limited to structured, non-conforming meshes; curved
+  boundaries are still approximated by a staircase.
+
+## Historical delta from the original version
+
+### Implemented improvements
+
+- Graded Cartesian mesh support via piecewise-uniform coordinate arrays and a
+  dedicated builder for the parallel-plate example.
+- Independent bottom/top plate widths for the plate example, enabling asymmetric
+  fringing studies.
+- Optional boundary-tolerance verification and a combined convergence figure.
+- Structural refactoring into small helpers and configuration classes while keeping
+  the core FEM numerics bit-compatible with the original solver.
+
+### Known limitations that remain
+
+- The mesh is still structured and cannot conform to curved or non-axis-aligned
+  boundaries.
+- The direct sparse LU solve scales poorly at very fine mesh spacing and can require
+  significant memory.
+- Material assignment is still sampled at element centroids, which is exact for
+  axis-aligned grid-snapped regions but approximate for truly curved interfaces.
+
+### Future work
+
+- Add a truly unstructured or locally refined mesh strategy.
+- Explore iterative or symmetry-aware solvers to reduce memory pressure.
+- Extend the graded-mesh strategy to coaxial and more general geometries.
+
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)

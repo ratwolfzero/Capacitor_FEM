@@ -1,31 +1,8 @@
 """
-capacitor_fem_graded.py (refactored)
-=========================================
+Two-dimensional finite-element electrostatics solver.
 
-A two-dimensional finite-element electrostatics solver for simulating
-capacitor geometries -- parallel plates, coaxial cables, and (via the
-Shape/CSG primitives in GEOMETRY) more complex arrangements built from
-simple shapes -- instead of relying on closed-form formulas that only
-exist for a handful of idealized geometries.  Pure NumPy / SciPy /
-Matplotlib, no external mesh-generation library.
-
-This refactored edition keeps the physics, numerics, and validation
-results **bit-identical** to the original.  All changes are structural:
-
-  * Every tunable switch, path, tolerance, and heuristic multiplier is
-    declared up-front in Section 0 (TUNABLE RUNTIME PARAMETERS).
-
-  * Geometry configurations share a common base class that implements
-    the convergence-spacing auto-derivation once, removing duplication.
-
-  * The parallel-plate example's geometry construction, graded-mesh
-    construction, and solver orchestration are split into small,
-    single-purpose helpers.
-
-  * Long boiler-plate print blocks are extracted into helpers gated by
-    the VERBOSE_CONVERGENCE_NOTES switch.
-
-Full physics documentation lives in README.md.
+The current implementation status, historical changes, limitations, and future
+work are documented in README.md.
 """
 
 import os
@@ -43,11 +20,9 @@ import scipy.interpolate as interp
 
 
 # =============================================================================
-# 0. TUNABLE RUNTIME PARAMETERS  --  EDIT THESE TO CHANGE BEHAVIOUR
+# 0. Runtime switches and tuning
 # =============================================================================
-# Every behavioural switch, path, tolerance, and heuristic multiplier lives
-# here in one place.  The sections below (physics, geometry, solver, …) should
-# rarely need editing for day-to-day use.
+# See README.md for the broader context, current status, and limitations.
 
 # --- Execution switches (True / False) ---------------------------------------
 RUN_BOUNDARY_STRESS_TEST: bool = False
@@ -128,8 +103,7 @@ EPS0 = 8.8541878128e-12  # vacuum permittivity [F/m]
 # =============================================================================
 # 2. CONFIGURATION
 # =============================================================================
-# Every geometry, material, and numerical tuning parameter lives here as
-# frozen dataclasses.  See README.md section 5.2.
+# Geometry, material, and solver settings live in frozen dataclasses.
 
 @dataclass(frozen=True)
 class _AutoSpacingConfig:
@@ -711,26 +685,19 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
 
-    # Zero the nodal field inside conductors so streamlines terminate
-    # cleanly at the electrode surface (np.gradient leaves small residuals
-    # on Dirichlet nodes).
+    # Keep streamlines from leaking into conductor nodes.
     ExG_plot = np.where(cond_grid, 0.0, ExG)
     EyG_plot = np.where(cond_grid, 0.0, EyG)
 
-    # streamplot requires equally-spaced coordinates.  On a graded mesh
-    # we therefore interpolate the (already zeroed) nodal field onto a
-    # temporary uniform grid that covers the same bounding box; on a
-    # uniform mesh we can feed the original arrays directly.
+    # Interpolate onto a uniform grid for streamplot when the mesh is graded.
     dx = np.diff(xs)
     dy = np.diff(ys)
     is_graded = (np.ptp(dx) > 1e-12 * max(1.0, np.mean(dx)) or
                  np.ptp(dy) > 1e-12 * max(1.0, np.mean(dy)))
 
     if is_graded:
-        # denser than the coarsest cell, coarser than the finest cell
         n_plot_x = max(nx, int(round((xs[-1] - xs[0]) / np.min(dx))) + 1)
         n_plot_y = max(ny, int(round((ys[-1] - ys[0]) / np.min(dy))) + 1)
-        # keep the temporary grid modest so streamplot stays fast
         n_plot_x = min(n_plot_x, 400)
         n_plot_y = min(n_plot_y, 400)
 
@@ -738,20 +705,15 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
         ys_u = np.linspace(ys[0], ys[-1], n_plot_y)
         Xu, Yu = np.meshgrid(xs_u, ys_u)
 
-        # RegularGridInterpolator needs the original (possibly graded)
-        # coordinate vectors; it handles non-uniform spacing correctly.
         from scipy.interpolate import RegularGridInterpolator
         interp_Ex = RegularGridInterpolator(
             (ys, xs), ExG_plot, bounds_error=False, fill_value=0.0)
         interp_Ey = RegularGridInterpolator(
             (ys, xs), EyG_plot, bounds_error=False, fill_value=0.0)
-        # points must be (..., 2) with order (y, x) matching the interpolator
         pts = np.column_stack([Yu.ravel(), Xu.ravel()])
         Ex_u = interp_Ex(pts).reshape(Yu.shape)
         Ey_u = interp_Ey(pts).reshape(Yu.shape)
 
-        # re-apply the conductor mask on the uniform grid so streamlines
-        # still stop at the electrode surfaces
         cond_u = np.zeros_like(Xu, dtype=bool)
         for cond in conductors:
             cond_u |= cond.contains(Xu, Yu)
@@ -951,7 +913,6 @@ def _build_parallel_plate_geometry(config, h):
     Lx = plate_w_max + 2 * margin
     Ly = 2 * plate_t + gap + 2 * margin
 
-    # Center both plates inside the max-width slot
     x_bottom0 = margin + 0.5 * (plate_w_max - bottom_w)
     x_top0 = margin + 0.5 * (plate_w_max - top_w)
     y_gap_lo = margin + plate_t
@@ -963,7 +924,6 @@ def _build_parallel_plate_geometry(config, h):
                           voltage=config.voltage, name="top_plate")
     conductors = [bottom_plate, top_plate]
 
-    # Dielectric under the wider plate (still exact on grid after snap)
     slab = Rectangle(margin, y_gap_lo, plate_w_max, dielectric_t,
                      eps_r=config.dielectric_eps_r, name="dielectric_slab")
     eps_r_of_xy = make_eps_r_function(
@@ -994,7 +954,6 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     tune = tune or GRADED_MESH_DEFAULTS
     d = dims
 
-    # Use the bounding (max) plate for the classic 5-segment x-layout
     plate_w = d["plate_w_max"]
     x_plate0 = d["x_plate0"]  # == margin
 
@@ -1023,17 +982,14 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
         (x_plate0 + plate_w, d["Lx"], n_margin_x),
     ])
 
-    # y-direction: coarse outer margins → medium plates → fine gap
-    # split at the dielectric interface so the material boundary is a
-    # segment junction (exact grid alignment, no straddling elements).
+    # Keep the dielectric interface aligned with the mesh.
     n_margin_y = max(tune.min_margin_points,
                      round(d["margin"] / (tune.margin_spacing_factor * h)) + 1)
     n_plate = max(tune.min_plate_points,
                   round(d["plate_t"] / (tune.plate_spacing_factor * h)) + 1)
 
     y_diel = d["y_gap_lo"] + d["dielectric_t"]
-    # Keep the same total gap points / fine spacing as before; share the
-    # junction node so n_diel + n_air - 1 == n_gap.
+    # Share the interface node so the graded split remains consistent.
     n_gap = max(tune.min_gap_points,
                 round(d["gap"] / (tune.gap_spacing_factor * h)) + 1)
     frac = d["dielectric_t"] / d["gap"]
