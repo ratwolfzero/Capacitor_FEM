@@ -9,13 +9,17 @@ except ImportError as exc:
         "Python environment before running this smoke check."
     ) from exc
 
-sys.path.insert(0, os.path.dirname(__file__))
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+for candidate in (repo_root, os.path.dirname(__file__)):
+    if candidate not in sys.path:
+        sys.path.insert(0, candidate)
+
 try:
     import capacitor_fem as fem
 except ImportError as exc:
     raise SystemExit(
-        "Could not import the FEM module. Run this script from the repository root "
-        "with the same interpreter that has the scientific packages installed."
+        "Could not import the FEM module. Run this script with the same interpreter "
+        "that has the scientific packages installed."
     ) from exc
 
 # Run this with the original system Python interpreter, not a project-local
