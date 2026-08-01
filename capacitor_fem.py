@@ -15,9 +15,9 @@ from typing import ClassVar
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
-import scipy.interpolate as interp
 
 
 # =============================================================================
@@ -765,7 +765,6 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
         ys_u = np.linspace(ys[0], ys[-1], n_plot_y)
         Xu, Yu = np.meshgrid(xs_u, ys_u)
 
-        from scipy.interpolate import RegularGridInterpolator
         interp_Ex = RegularGridInterpolator(
             (ys, xs), ExG_plot, bounds_error=False, fill_value=0.0)
         interp_Ey = RegularGridInterpolator(
@@ -819,8 +818,10 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
         os.makedirs(os.path.dirname(fname) or ".", exist_ok=True)
         fig.savefig(fname, dpi=style.dpi)
     if SHOW_PLOTS:
+        fig.canvas.draw_idle()
         plt.show()
-    plt.close(fig)
+    else:
+        plt.close(fig)
 
 
 def plot_convergence_study(pp_results, coax_results, graded_result=None,
@@ -917,8 +918,10 @@ def plot_convergence_study(pp_results, coax_results, graded_result=None,
         fig.savefig(fname, dpi=style.dpi)
         print(f"Convergence figure saved to {fname}")
     if SHOW_PLOTS:
+        fig.canvas.draw_idle()
         plt.show()
-    plt.close(fig)
+    else:
+        plt.close(fig)
 
 
 # =============================================================================
