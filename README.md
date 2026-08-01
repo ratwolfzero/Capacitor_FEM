@@ -13,29 +13,28 @@ python3 capacitor_fem.py
 ```
 
 This document covers the physics, the mathematics, the numerical method, the software
-architecture, and how to use and extend the code. It assumes familiarity with vector
-calculus, linear algebra, and Python, but not with finite elements specifically —
-the derivation starts from Maxwell's equations and builds up.
+architecture, and the usage of the code. It assumes familiarity with vector calculus,
+linear algebra, and Python, but not necessarily with finite elements; the derivation
+starts from Maxwell's equations and builds up from there.
 
 This repository now uses a single consolidated document for the current implementation,
-the refactoring delta, the known limitations, and the future work. The separate
-graded-refactoring note has been folded into this file so that the current state,
-historical improvements, and remaining gaps are visible together.
+its development history, known limitations, and future work. The earlier graded-
+refactoring note has been folded into this file so that the present state,
+historical changes, and remaining gaps are visible together.
 
 ## Current implementation status
 
-- The solver now supports a structured triangular mesh with optional graded Cartesian
-  refinement in the parallel-plate example.
-- The parallel-plate example can use independent plate widths and reports a
+- The solver uses a structured triangular mesh and supports optional graded Cartesian
+  refinement for the parallel-plate example.
+- The parallel-plate example supports independent plate widths and reports a
   convergence study with optional plots.
-- The refactored version centralizes runtime switches, geometry configuration, and
-  boundary-tolerance handling in one place.
-- The current code remains limited to structured, non-conforming meshes; curved
+- Runtime switches, geometry configuration, and boundary-tolerance handling are
+  centralized in one place.
+- The implementation remains limited to structured, non-conforming meshes; curved
   boundaries are still approximated by a staircase.
-- The implementation now includes conservative safeguards for underdetermined
-  solves, degenerate triangle warnings, and more consistent FEM-field-based
-  plotting while keeping the same direct sparse-solve approach and the same
-  dependency set.
+- The code now includes conservative safeguards for underdetermined solves,
+  degenerate-triangle warnings, and more consistent FEM-field-based plotting,
+  while preserving the same direct sparse-solve approach and dependency set.
 
 ## Historical delta from the original version
 
@@ -57,6 +56,10 @@ historical improvements, and remaining gaps are visible together.
   significant memory.
 - Material assignment is still sampled at element centroids, which is exact for
   axis-aligned grid-snapped regions but approximate for truly curved interfaces.
+- The solver is intended as a practical engineering approximation for education,
+  basic design comparison, and material selection. It is not intended as a
+  high-accuracy tool for detailed design work where curved boundaries, sharp
+  singularities, or highly refined geometries are dominant.
 
 ### Future work
 
