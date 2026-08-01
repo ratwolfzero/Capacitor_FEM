@@ -37,10 +37,10 @@ RUN_EXACT_CHECK: bool = False
 RUN_GRADED_COMPARISON: bool = True
 """For the parallel-plate example, also solve on a graded mesh and report ΔC."""
 
-SAVE_FIGURES: bool = False
+SAVE_FIGURES: bool = True
 """Write PNG files to OUTPUT_DIR."""
 
-SHOW_PLOTS: bool = True
+SHOW_PLOTS: bool = False
 """Call plt.show() after each figure (blocks until window is closed)."""
 
 VERBOSE_CONVERGENCE_NOTES: bool = False
