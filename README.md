@@ -32,6 +32,10 @@ historical improvements, and remaining gaps are visible together.
   boundary-tolerance handling in one place.
 - The current code remains limited to structured, non-conforming meshes; curved
   boundaries are still approximated by a staircase.
+- The implementation now includes conservative safeguards for underdetermined
+  solves, degenerate triangle warnings, and more consistent FEM-field-based
+  plotting while keeping the same direct sparse-solve approach and the same
+  dependency set.
 
 ## Historical delta from the original version
 
@@ -63,6 +67,11 @@ historical improvements, and remaining gaps are visible together.
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
+  - [Current implementation status](#current-implementation-status)
+  - [Historical delta from the original version](#historical-delta-from-the-original-version)
+    - [Implemented improvements](#implemented-improvements)
+    - [Known limitations that remain](#known-limitations-that-remain)
+    - [Future work](#future-work)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)

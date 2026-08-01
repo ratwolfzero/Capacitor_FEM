@@ -7,6 +7,7 @@ work are documented in README.md.
 
 import os
 import time
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
@@ -98,6 +99,19 @@ GRADED_MESH_DEFAULTS: GradedMeshTuning = GradedMeshTuning()
 # 1. PHYSICS CONSTANTS
 # =============================================================================
 EPS0 = 8.8541878128e-12  # vacuum permittivity [F/m]
+
+
+def _validate_boundary_tolerance():
+    """Guard against nonsensical boundary-tolerance values."""
+    tol = BOUNDARY_TOLERANCE_M
+    if not np.isfinite(tol) or tol <= 0.0:
+        raise ValueError("BOUNDARY_TOLERANCE_M must be a positive finite number")
+    if tol <= 10 * np.finfo(float).eps:
+        warnings.warn(
+            "BOUNDARY_TOLERANCE_M is extremely small; geometry classification may be brittle.")
+
+
+_validate_boundary_tolerance()
 
 
 # =============================================================================
@@ -489,6 +503,19 @@ def evaluate_material(mesh, eps_r_of_xy):
     return eps_r_of_xy(cxy[:, 0], cxy[:, 1]) * EPS0
 
 
+def _warn_if_degenerate_triangles(mesh, area):
+    """Emit a warning if triangle areas are non-finite or suspiciously small."""
+    if np.any(~np.isfinite(area)) or np.any(area <= 0.0):
+        warnings.warn(
+            "Encountered non-finite or non-positive triangle areas; the mesh may be degenerate.")
+        return
+
+    characteristic_area = max(1.0, np.ptp(mesh.xs) * np.ptp(mesh.ys))
+    if np.min(area) < 1e-10 * characteristic_area:
+        warnings.warn(
+            "Some triangles are extremely small relative to the domain size; the mesh may be too fine or too distorted.")
+
+
 def assemble_stiffness(mesh, eps_elem):
     """Assemble the sparse global stiffness matrix K for div(ε grad V)=0.
     Vectorised triplet assembly; duplicate (row,col) entries are summed
@@ -496,6 +523,7 @@ def assemble_stiffness(mesh, eps_elem):
     tris = mesh.triangles
     n = mesh.n_nodes
     b, c, area, area2 = _triangle_geometry(mesh)
+    _warn_if_degenerate_triangles(mesh, area)
 
     Ke = b[:, :, None] * b[:, None, :] + c[:, :, None] * c[:, None, :]
     Ke = Ke * (eps_elem / (4.0 * area))[:, None, None]
@@ -526,14 +554,24 @@ def apply_conductors_and_solve(mesh, K, conductors):
     free_idx = np.flatnonzero(~is_fixed)
 
     solve_time = 0.0
-    if free_idx.size > 0:
-        K_ff = K[free_idx][:, free_idx].tocsc()
-        K_fd = K[free_idx][:, fixed_idx].tocsc()
-        rhs = -K_fd.dot(V[fixed_idx])
+    if free_idx.size == 0:
+        return V, is_fixed, solve_time
 
-        t0 = time.time()
-        V[free_idx] = spsolve(K_ff, rhs)
-        solve_time = time.time() - t0
+    if fixed_idx.size == 0:
+        warnings.warn(
+            "No Dirichlet nodes were assigned; the reduced system is underdetermined. Returning the zero field.")
+        return V, is_fixed, solve_time
+
+    K_ff = K[free_idx][:, free_idx].tocsc()
+    K_fd = K[free_idx][:, fixed_idx].tocsc()
+    rhs = -K_fd.dot(V[fixed_idx])
+
+    if K_ff.shape[0] == 0:
+        return V, is_fixed, solve_time
+
+    t0 = time.time()
+    V[free_idx] = spsolve(K_ff, rhs)
+    solve_time = time.time() - t0
 
     return V, is_fixed, solve_time
 
@@ -618,15 +656,31 @@ class ElectrostaticProblem:
             raise RuntimeError("call .solve() before .plot()")
         plot_solution(self.mesh, self.V, self.eps_r_of_xy, self.energy_density,
                       self.conductors, self.is_fixed, title, fname,
-                      xlim=xlim, ylim=ylim, style=style)
+                      xlim=xlim, ylim=ylim, style=style,
+                      Ex=getattr(self, "Ex", None), Ey=getattr(self, "Ey", None))
 
 
 # =============================================================================
 # 9. VISUALIZATION
 # =============================================================================
 
+def _project_element_field_to_nodes(mesh, values):
+    """Project a per-element field to nodal values by averaging contributions."""
+    nodal = np.zeros(mesh.n_nodes, dtype=float)
+    counts = np.zeros(mesh.n_nodes, dtype=float)
+    tris = mesh.triangles
+    np.add.at(nodal, tris[:, 0], values)
+    np.add.at(nodal, tris[:, 1], values)
+    np.add.at(nodal, tris[:, 2], values)
+    np.add.at(counts, tris[:, 0], 1.0)
+    np.add.at(counts, tris[:, 1], 1.0)
+    np.add.at(counts, tris[:, 2], 1.0)
+    return nodal / counts
+
+
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
-                  title, fname, xlim=None, ylim=None, style=None):
+                  title, fname, xlim=None, ylim=None, style=None,
+                  Ex=None, Ey=None):
     """Four-panel summary: dielectric map, equipotentials, field magnitude
     with streamlines, and energy density (log scale)."""
     style = style or PlotConfig()
@@ -640,8 +694,14 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
         cond_grid |= cond.contains(X, Y)
     epsr_masked = np.ma.masked_where(cond_grid, epsr_grid)
 
-    dVdy_grid, dVdx_grid = np.gradient(V_grid, ys, xs)
-    ExG, EyG = -dVdx_grid, -dVdy_grid
+    if Ex is None or Ey is None:
+        dVdy_grid, dVdx_grid = np.gradient(V_grid, ys, xs)
+        ExG, EyG = -dVdx_grid, -dVdy_grid
+    else:
+        Ex_nodes = _project_element_field_to_nodes(mesh, np.asarray(Ex, dtype=float))
+        Ey_nodes = _project_element_field_to_nodes(mesh, np.asarray(Ey, dtype=float))
+        ExG = Ex_nodes.reshape(ny, nx)
+        EyG = Ey_nodes.reshape(ny, nx)
     EmagG = np.hypot(ExG, EyG)
     EmagG_masked = np.ma.masked_where(cond_grid, EmagG)
 
@@ -1034,7 +1094,7 @@ def _solve_parallel_plate(config, h, use_graded=False):
 
     result = dict(h=h, mesh=mesh, conductors=conductors, eps_r_of_xy=eps_r_of_xy,
                   V=V, is_fixed=is_fixed, energy_density=energy_density,
-                  C=C, C_ideal=C_ideal, solve_time=solve_time, graded=use_graded)
+                  Ex=Ex, Ey=Ey, C=C, C_ideal=C_ideal, solve_time=solve_time, graded=use_graded)
     result.update(d)
     return result
 
@@ -1131,6 +1191,7 @@ def example_parallel_plate(config=None):
                       graded["energy_density"], graded["conductors"], graded["is_fixed"],
                       "Parallel-plate capacitor (glass slab in an air gap) — graded mesh",
                       os.path.join(OUTPUT_DIR, "example1_parallel_plate.png"),
+                      Ex=graded["Ex"], Ey=graded["Ey"],
                       xlim=(graded["x_plate0"] - config.plot_margin,
                             graded["x_plate0"] + graded["plate_w"] + config.plot_margin),
                       ylim=(graded["margin"] - config.plot_margin,
@@ -1143,6 +1204,7 @@ def example_parallel_plate(config=None):
                   uniform["energy_density"], uniform["conductors"], uniform["is_fixed"],
                   "Parallel-plate capacitor (glass slab in an air gap)",
                   os.path.join(OUTPUT_DIR, "example1_parallel_plate.png"),
+                  Ex=uniform["Ex"], Ey=uniform["Ey"],
                   xlim=(uniform["x_plate0"] - config.plot_margin,
                         uniform["x_plate0"] + uniform["plate_w"] + config.plot_margin),
                   ylim=(uniform["margin"] - config.plot_margin,
@@ -1180,7 +1242,7 @@ def _solve_coax(config, h):
 
     return dict(h=h, mesh=mesh, conductors=conductors, eps_r_of_xy=eps_r_of_xy,
                 V=V, is_fixed=is_fixed, energy_density=energy_density,
-                C=C, C_ideal=C_ideal, solve_time=solve_time)
+                Ex=Ex, Ey=Ey, C=C, C_ideal=C_ideal, solve_time=solve_time)
 
 
 def example_coax(config=None):
@@ -1225,7 +1287,8 @@ def example_coax(config=None):
     plot_solution(result["mesh"], result["V"], result["eps_r_of_xy"],
                   result["energy_density"], result["conductors"], result["is_fixed"],
                   "Coaxial capacitor (polyethylene dielectric)",
-                  os.path.join(OUTPUT_DIR, "example2_coax.png"))
+                  os.path.join(OUTPUT_DIR, "example2_coax.png"),
+                  Ex=result["Ex"], Ey=result["Ey"])
     return C, C_ideal, results
 
 
