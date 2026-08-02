@@ -18,9 +18,7 @@ linear algebra, and Python, but not necessarily with finite elements; the deriva
 starts from Maxwell's equations and builds up from there.
 
 This repository now uses a single consolidated document for the current implementation,
-its development history, known limitations, and future work. The earlier graded-
-refactoring note has been folded into this file so that the present state,
-historical changes, and remaining gaps are visible together.
+its development history, known limitations, and future work.
 
 ## Current implementation status
 
