@@ -6,6 +6,7 @@ work are documented in README.md.
 """
 
 import os
+import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
@@ -13,8 +14,6 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
-import matplotlib
-matplotlib.use("TKAgg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
@@ -40,7 +39,7 @@ RUN_GRADED_COMPARISON: bool = True
 SAVE_FIGURES: bool = True
 """Write PNG files to OUTPUT_DIR."""
 
-SHOW_PLOTS: bool = False
+SHOW_PLOTS: bool = True
 """Call plt.show() after each figure (blocks until window is closed)."""
 
 VERBOSE_CONVERGENCE_NOTES: bool = False
@@ -50,6 +49,29 @@ PLOT_CONVERGENCE: bool = True
 """After both examples, draw a combined convergence figure (parallel-plate +
 coax) with ideal/analytical references and relative error vs the reference
 computed from the active parameter settings."""
+
+MPL_BACKEND: str = ""
+"""Force a specific matplotlib backend (e.g. "TkAgg", "MacOSX", "QtAgg").
+Leave as "" to auto-select instead: on macOS, try the native "MacOSX"
+backend first (ships inside matplotlib, no Tk involved), then "TkAgg", then
+Qt if a binding happens to already be installed; everywhere else, skip
+straight to "TkAgg" then Qt. Falls back to "Agg" (figures still get saved
+via SAVE_FIGURES, just not shown) if nothing interactive can be imported.
+
+Why "MacOSX" goes first on macOS: many macOS Python installs still link
+against Apple's system Tcl/Tk 8.5, which has been deprecated since OS X
+10.9 and is a well-documented source of SHOW_PLOTS=True segfaults on newer
+macOS versions -- and a segfault is a native-code crash, not a Python
+exception, so no amount of try/except in this file can catch one. Picking
+"MacOSX" avoids Tk entirely rather than trying to survive it. It only works
+on a "framework build" of Python (python.org installers, Homebrew's
+`python`, and plain system Python all qualify; some pyenv/pyenv-virtualenv
+builds do not), in which case it fails with a clean, catchable ImportError
+and this falls through to "TkAgg" automatically. If you specifically need
+TkAgg and it's segfaulting, the durable fix is almost always to give Python
+a modern Tcl/Tk (>= 8.6) -- e.g. `brew install python-tk`, the python.org
+installer, or a conda-forge Python -- since no backend-selection trick can
+repair a broken native library once it's the only option left."""
 
 # --- I/O ----------------------------------------------------------------------
 OUTPUT_DIR: str = ""
@@ -95,6 +117,66 @@ class GradedMeshTuning:
 
 # Instantiate with defaults.  Replace this line to tweak globally:
 GRADED_MESH_DEFAULTS: GradedMeshTuning = GradedMeshTuning()
+
+
+def _select_interactive_backend():
+    """Pick a matplotlib backend that's actually importable here, instead of
+    hard-coding one that may not be (or may be present but crash-prone).
+    See MPL_BACKEND's docstring above for the macOS/Tcl-Tk background.
+
+    plt.switch_backend() is used rather than matplotlib.use(): the latter
+    only records a preference and defers the real import to first use, so a
+    bad choice wouldn't surface until deep inside plot_solution's first
+    plt.subplots() call; switch_backend() imports the backend module right
+    now, so a missing one raises a clear, catchable exception here, before
+    any solve work happens, and we can fall through to the next candidate.
+
+    This is a risk-reduction measure, not a guarantee: a true segfault is a
+    native-code crash, not a Python exception, and nothing in pure Python
+    -- this function included -- can catch one. What this function *can* do
+    is avoid needlessly reaching for a crash-prone backend when a safer one
+    is available, and fail into "Agg" (always importable; disables
+    SHOW_PLOTS but not SAVE_FIGURES) rather than propagating an ImportError
+    out of module import if nothing interactive is usable at all.
+    """
+    if MPL_BACKEND:
+        try:
+            plt.switch_backend(MPL_BACKEND)
+            return MPL_BACKEND
+        except Exception as exc:
+            warnings.warn(
+                f"MPL_BACKEND={MPL_BACKEND!r} could not be loaded "
+                f"({type(exc).__name__}: {exc}); falling back to "
+                f"auto-selection.")
+
+    if sys.platform == "darwin":
+        candidates = ["MacOSX", "TkAgg", "QtAgg", "Qt5Agg"]
+    else:
+        candidates = ["TkAgg", "QtAgg", "Qt5Agg"]
+
+    for name in candidates:
+        try:
+            plt.switch_backend(name)
+            return name
+        except Exception:
+            continue
+
+    plt.switch_backend("Agg")
+    return "Agg"
+
+
+ACTIVE_BACKEND: str = _select_interactive_backend()
+"""Backend actually selected by _select_interactive_backend() at import
+time. Read this if you need to know what got picked (e.g. to decide
+whether to bother setting SHOW_PLOTS)."""
+
+if SHOW_PLOTS and ACTIVE_BACKEND == "Agg":
+    warnings.warn(
+        "SHOW_PLOTS is True but no interactive matplotlib backend could be "
+        "imported (tried MacOSX/TkAgg/Qt, as applicable for this "
+        "platform); continuing with the non-interactive Agg backend. "
+        "Figures will still be written to OUTPUT_DIR if SAVE_FIGURES is "
+        "True, but no windows will be shown.")
 
 
 # =============================================================================
@@ -800,17 +882,33 @@ def _project_element_field_to_nodes(mesh, values):
 
 
 def _show_blocking_figure(fig, message=None):
-    """Display a figure and wait for the user to close it."""
-    if not SHOW_PLOTS:
+    """Display a figure and wait for the user to close it.
+
+    If ACTIVE_BACKEND is "Agg" (no interactive backend could be loaded --
+    see _select_interactive_backend), this never attempts to show anything;
+    that was already reported once, at import time. If showing fails for
+    some other reason (a display-server hiccup, a closed connection -- not
+    a segfault, which can't be caught from here), the figure is closed and
+    the run continues rather than losing an already-completed solve: by
+    this point the numbers are computed and, if SAVE_FIGURES is True, the
+    PNG is already on disk.
+    """
+    if not SHOW_PLOTS or ACTIVE_BACKEND == "Agg":
         plt.close(fig)
         return
 
     if message:
         print(message)
 
-    fig.canvas.draw_idle()
-    plt.show(block=True)
-    plt.close(fig)
+    try:
+        fig.canvas.draw_idle()
+        plt.show(block=True)
+    except Exception as exc:
+        warnings.warn(
+            f"Could not display the figure interactively "
+            f"({type(exc).__name__}: {exc}); continuing without it.")
+    finally:
+        plt.close(fig)
 
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,

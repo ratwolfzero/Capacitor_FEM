@@ -67,6 +67,20 @@ historical changes, and remaining gaps are visible together.
   instead. `Rectangle`/`Circle`/`OutsideCircle` also reject non-positive
   width/height/radius at construction, and `capacitance_from_energy` rejects
   `V_hi == V_lo` instead of silently returning NaN.
+- Adaptive matplotlib backend selection (`_select_interactive_backend`,
+  `MPL_BACKEND`) instead of a hard-coded `matplotlib.use("TKAgg")`. `TkAgg`
+  depends on the Python installation's system Tcl/Tk, and the deprecated
+  Tcl/Tk 8.5 that many macOS Python builds still link is a known source of
+  `SHOW_PLOTS=True` segfaults there. The backend is now probed with
+  `plt.switch_backend` (which imports the backend module immediately, unlike
+  `matplotlib.use`, so a bad choice is caught right away rather than
+  surfacing later inside `plot_solution`) in a priority order that puts the
+  native `MacOSX` backend first on macOS -- no Tk involved at all -- falling
+  through to `TkAgg`, then Qt if installed, then the always-available `Agg`
+  (figures still get saved, just not shown). A genuine segfault still can't
+  be caught from Python; this reduces the odds of needing the crash-prone
+  path rather than promising immunity to it. See §6 for the practical
+  summary and `MPL_BACKEND`'s docstring in the source for the full reasoning.
 
 ### Known limitations that remain
 
@@ -588,6 +602,21 @@ pip install numpy scipy matplotlib
 
 Python 3.8 or later (uses `dataclasses`, f-strings, and standard type hints; no
 newer syntax). No compiled extensions, no system packages, no `gmsh`.
+
+**Interactive plotting on macOS.** With `SHOW_PLOTS = True`, the script used to
+hard-code matplotlib's `TkAgg` backend, which depends on your Python's system
+Tcl/Tk. Many macOS Python installs still link the old, Apple-deprecated Tcl/Tk
+8.5, a well-documented source of segfaults with matplotlib + Tkinter on
+current macOS versions -- and a segfault can't be caught or worked around
+from inside this script; it's a native crash, not a Python exception. The
+script now picks a backend adaptively instead (`MacOSX` first on macOS, since
+it doesn't touch Tk at all, then `TkAgg`, then Qt if installed, then `Agg` --
+figures still get saved, just not shown -- as a last resort), so a broken or
+missing backend degrades gracefully rather than crashing. See `MPL_BACKEND`'s
+docstring in the source for the full reasoning and how to force a specific
+backend. If you specifically need `TkAgg` and it still segfaults, the durable
+fix is giving Python a modern Tcl/Tk (>= 8.6), e.g. `brew install python-tk`,
+the python.org installer, or a conda-forge Python -- not a workaround here.
 
 ## 7. Usage
 
