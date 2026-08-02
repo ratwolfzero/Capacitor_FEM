@@ -40,7 +40,7 @@ RUN_GRADED_COMPARISON: bool = True
 SAVE_FIGURES: bool = True
 """Write PNG files to OUTPUT_DIR."""
 
-SHOW_PLOTS: bool = False
+SHOW_PLOTS: bool = True
 """Call plt.show() after each figure (blocks until window is closed)."""
 
 VERBOSE_CONVERGENCE_NOTES: bool = False
