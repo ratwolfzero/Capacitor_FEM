@@ -75,20 +75,20 @@ MEMORY_CRITICAL_THRESHOLD_NODES: int = 5_000_000
 class GradedMeshTuning:
     """Tuning knobs for the piecewise-uniform graded Cartesian mesh.
     All *spacing* fields are multipliers of the nominal grid spacing h."""
-    edge_band_width_factor: float = 4.0       # width of refined zone at plate ends
-    edge_band_width_min_m: float = 1.5e-3     # minimum absolute width [m]
-    margin_spacing_factor: float = 2.0        # coarsen margins by this factor
-    edge_spacing_factor: float = 0.5          # refine edge bands by this factor
-    interior_spacing_factor: float = 1.2      # slightly coarsen plate interior
-    plate_spacing_factor: float = 0.8         # spacing through conductor plates
-    gap_spacing_factor: float = 0.45          # finest spacing through the gap
-    min_margin_points: int = 4
-    min_edge_points: int = 6
-    min_interior_points: int = 8
-    min_plate_points: int = 4
-    min_gap_points: int = 10
-    min_fallback_interior_points: int = 4
-    fallback_interior_spacing_factor: float = 1.0
+    edge_band_width_factor: float = 4.0           # width of refined zone at plate ends
+    edge_band_width_min_m: float = 1.5e-3         # minimum absolute width [m]
+    margin_spacing_factor: float = 2.0            # coarsen margins by this factor
+    edge_spacing_factor: float = 0.5              # refine edge bands by this factor
+    interior_spacing_factor: float = 1.2          # slightly coarsen plate interior
+    plate_spacing_factor: float = 0.8             # spacing through conductor plates
+    gap_spacing_factor: float = 0.45              # finest spacing through the gap
+    min_margin_points: int = 4                    # floor on points in each margin
+    min_edge_points: int = 6                      # floor on points in each edge band
+    min_interior_points: int = 8                  # floor on points in plate interior
+    min_plate_points: int = 4                     # floor on points through a plate
+    min_gap_points: int = 10                      # floor on points through the gap
+    min_fallback_interior_points: int = 4.        # floor when plate is too narrow for edge bands
+    fallback_interior_spacing_factor: float = 1.0 # spacing factor used in that fallback
 
 
 # Instantiate with defaults.  Replace this line to tweak globally:
