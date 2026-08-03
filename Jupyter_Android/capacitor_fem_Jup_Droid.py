@@ -56,15 +56,11 @@ PLOT_CONVERGENCE: bool = True
 """After both examples, draw a combined convergence figure."""
 
 # --- Android / mobile robustness ---------------------------------------------
-PLOT_WAIT_TIMEOUT_S: float = 45.0
-"""Maximum seconds to wait for the user to close an interactive plot window.
-Prevents the script from hanging forever on platforms where closing the
-figure is unreliable (especially PyDroid3 on Android)."""
+# On PyDroid / Android we never try to open interactive plot windows.
+# Figures are always written to disk when SAVE_FIGURES = True.
+FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
-FORCE_NONINTERACTIVE_ON_ANDROID: bool = False
-"""When True and Android/PyDroid is detected, show each figure briefly then
-automatically continue.  Figures are still saved to disk (if SAVE_FIGURES
-is True).  Recommended setting for phones/tablets."""
+PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop/Jupyter fallback
 
 # --- I/O ----------------------------------------------------------------------
 OUTPUT_DIR: str = ""
@@ -113,14 +109,12 @@ GRADED_MESH_DEFAULTS: GradedMeshTuning = GradedMeshTuning()
 
 
 def _is_android() -> bool:
-    """Best-effort detection of Android / PyDroid environment."""
+    """Best-effort detection of Android / PyDroid."""
     try:
         return (
             "ANDROID" in os.environ
             or "ANDROID_ROOT" in os.environ
             or "ANDROID_DATA" in os.environ
-            or (platform.system().lower() == "linux"
-                and "android" in platform.platform().lower())
             or "pydroid" in sys.executable.lower()
             or os.path.exists("/system/build.prop")
         )
@@ -128,13 +122,10 @@ def _is_android() -> bool:
         return False
 
 
-# Force a non-interactive backend early on Android when requested.
-# Must happen before any pyplot figure is created.
-if FORCE_NONINTERACTIVE_ON_ANDROID and _is_android():
+if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
-        print("Android/PyDroid detected → using non-interactive Agg backend "
-              "(figures will be saved to disk).")
+        print("Android/PyDroid detected → Agg backend (save-only mode)")
     except Exception:
         pass
 
@@ -791,50 +782,38 @@ def _project_element_field_to_nodes(mesh, values):
 
 
 def _show_blocking_figure(fig, message=None):
-    """Display a figure and wait (with timeout / Android fallback).
-
-    Behaviour:
-      - SHOW_PLOTS == False          → close immediately
-      - Android + FORCE_NONINTERACTIVE → brief non-blocking show, then continue
-      - Desktop / Jupyter            → wait for user to close the window,
-                                       but never hang longer than PLOT_WAIT_TIMEOUT_S
+    """
+    On Android / PyDroid: never open an interactive window – just close the figure.
+    On desktop / Jupyter : keep the previous interactive behaviour with timeout.
     """
     if not SHOW_PLOTS:
         plt.close(fig)
         return
 
+    on_android = _is_android()
+
+    # ---------- Pure save-only path for Android ----------
+    if on_android and FORCE_SAVE_ONLY_ON_ANDROID:
+        # Saving already happened in plot_solution / plot_convergence_study
+        plt.close(fig)
+        return
+
+    # ---------- Desktop / Jupyter interactive path ----------
     if message:
         print(message)
 
-    on_android = _is_android()
-
-    # ---------- Android / PyDroid path ----------
-    if on_android and FORCE_NONINTERACTIVE_ON_ANDROID:
-        print("(Android/PyDroid detected – showing figure briefly then continuing; "
-              "PNG files are also written if SAVE_FIGURES=True)")
-        try:
-            fig.canvas.draw_idle()
-            plt.show(block=False)
-            plt.pause(1.5)          # give the window a moment to appear
-        except Exception as exc:
-            print(f"(plt.show failed on Android: {exc})")
-        finally:
-            plt.close(fig)
-        return
-
-    # ---------- Desktop / Jupyter path ----------
     try:
         fig.canvas.draw_idle()
         plt.show(block=False)
     except Exception as e:
-        print(f"Warning: plt.show() failed ({e}); continuing without interactive window.")
+        print(f"Warning: plt.show() failed ({e}); continuing.")
         plt.close(fig)
         return
 
     t0 = time.time()
     while plt.fignum_exists(fig.number):
         if time.time() - t0 > PLOT_WAIT_TIMEOUT_S:
-            print(f"(Plot wait timed out after {PLOT_WAIT_TIMEOUT_S:.0f} s – continuing)")
+            print(f"(Plot wait timed out after {PLOT_WAIT_TIMEOUT_S:.0f}s – continuing)")
             break
         try:
             fig.canvas.flush_events()
