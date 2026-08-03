@@ -601,6 +601,11 @@ against each geometry's analytical formula, and a four-panel summary figure
 seconds on a modern laptop, dominated by the finest resolution in each
 convergence sweep.
 
+Interactive plot windows block until closed. On macOS the platform default
+backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
+introduce close lag. If a window is put into full-screen with the
+green traffic-light button, exit with **Ctrl+F**.
+
 ### 7.2 Quick Start
 
 ```python

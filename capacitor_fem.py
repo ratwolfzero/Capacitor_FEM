@@ -105,7 +105,8 @@ def _validate_boundary_tolerance():
     """Guard against nonsensical boundary-tolerance values."""
     tol = BOUNDARY_TOLERANCE_M
     if not np.isfinite(tol) or tol <= 0.0:
-        raise ValueError("BOUNDARY_TOLERANCE_M must be a positive finite number")
+        raise ValueError(
+            "BOUNDARY_TOLERANCE_M must be a positive finite number")
     if tol <= 10 * np.finfo(float).eps:
         warnings.warn(
             "BOUNDARY_TOLERANCE_M is extremely small; geometry classification may be brittle.")
@@ -823,7 +824,8 @@ def _show_blocking_figure(fig, message=None):
             pass
         plt.pause(0.05)            # ~20 Hz is plenty; keeps UI responsive
 
-    plt.close(fig)                 # explicit cleanup (safe even if already closed)
+    # explicit cleanup (safe even if already closed)
+    plt.close(fig)
 
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
@@ -846,8 +848,10 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
         dVdy_grid, dVdx_grid = np.gradient(V_grid, ys, xs)
         ExG, EyG = -dVdx_grid, -dVdy_grid
     else:
-        Ex_nodes = _project_element_field_to_nodes(mesh, np.asarray(Ex, dtype=float))
-        Ey_nodes = _project_element_field_to_nodes(mesh, np.asarray(Ey, dtype=float))
+        Ex_nodes = _project_element_field_to_nodes(
+            mesh, np.asarray(Ex, dtype=float))
+        Ey_nodes = _project_element_field_to_nodes(
+            mesh, np.asarray(Ey, dtype=float))
         ExG = Ex_nodes.reshape(ny, nx)
         EyG = Ey_nodes.reshape(ny, nx)
     EmagG = np.hypot(ExG, EyG)
@@ -1241,7 +1245,8 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     plate_w = d["plate_w_max"]
     x_plate0 = d["x_plate0"]  # == margin
 
-    edge_band = max(tune.edge_band_width_factor * h, tune.edge_band_width_min_m)
+    edge_band = max(tune.edge_band_width_factor *
+                    h, tune.edge_band_width_min_m)
     n_margin_x = max(tune.min_margin_points,
                      round(d["margin"] / (tune.margin_spacing_factor * h)) + 1)
     n_edge = max(tune.min_edge_points,
@@ -1537,7 +1542,8 @@ def _solve_exact_check(config, h):
     """Full-width-plate variant: fringing is geometrically impossible."""
     plate_t, gap, dielectric_t, margin = _snap_plate_dims(config, h)
 
-    Lx = snap_to_grid(max(config.bottom_plate_width, config.top_plate_width), h)
+    Lx = snap_to_grid(max(config.bottom_plate_width,
+                      config.top_plate_width), h)
     Ly = 2 * plate_t + gap + 2 * margin
     nx = round(Lx / h) + 1
     ny = round(Ly / h) + 1
