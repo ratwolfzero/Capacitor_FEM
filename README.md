@@ -606,6 +606,9 @@ backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
 introduce close lag. If a window is put into full-screen with the
 green traffic-light button, exit with **Ctrl+F**.
 
+Jupyter / Carnets (iOS) note
+The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
+
 ### 7.2 Quick Start
 
 ```python
