@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
-import matplotlib
-matplotlib.use("TKAgg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
@@ -800,7 +798,13 @@ def _project_element_field_to_nodes(mesh, values):
 
 
 def _show_blocking_figure(fig, message=None):
-    """Display a figure and wait for the user to close it."""
+    """Display a figure and wait until the user closes it.
+
+    Uses a non-blocking show + poll loop so that the window is fully
+    destroyed before the next (potentially long) computation starts.
+    This avoids the macOS/TkAgg symptom where the closed window stays
+    visible during the subsequent solve.
+    """
     if not SHOW_PLOTS:
         plt.close(fig)
         return
@@ -809,8 +813,17 @@ def _show_blocking_figure(fig, message=None):
         print(message)
 
     fig.canvas.draw_idle()
-    plt.show(block=True)
-    plt.close(fig)
+    plt.show(block=False)          # return immediately, keep GUI alive
+
+    # Poll until the figure is really gone; pause() processes events
+    while plt.fignum_exists(fig.number):
+        try:
+            fig.canvas.flush_events()
+        except Exception:
+            pass
+        plt.pause(0.05)            # ~20 Hz is plenty; keeps UI responsive
+
+    plt.close(fig)                 # explicit cleanup (safe even if already closed)
 
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
