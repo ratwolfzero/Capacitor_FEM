@@ -61,7 +61,7 @@ PLOT_WAIT_TIMEOUT_S: float = 45.0
 Prevents the script from hanging forever on platforms where closing the
 figure is unreliable (especially PyDroid3 on Android)."""
 
-FORCE_NONINTERACTIVE_ON_ANDROID: bool = True
+FORCE_NONINTERACTIVE_ON_ANDROID: bool = False
 """When True and Android/PyDroid is detected, show each figure briefly then
 automatically continue.  Figures are still saved to disk (if SAVE_FIGURES
 is True).  Recommended setting for phones/tablets."""
