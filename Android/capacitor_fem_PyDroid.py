@@ -119,8 +119,12 @@ def _is_android() -> bool:
     except Exception:
         return False
 
-"""
+
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
+    # PyDroid3 already runs headless; _show_blocking_figure handles the rest.
+    if _is_android():
+       print("Android/PyDroid detected → save-only mode")
+"""
     try:
         matplotlib.use("Agg")
         print("Android/PyDroid detected → Agg backend (save-only mode)")
