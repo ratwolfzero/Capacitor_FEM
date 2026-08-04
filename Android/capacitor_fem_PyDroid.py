@@ -60,7 +60,7 @@ PLOT_CONVERGENCE: bool = True
 # Figures are always written to disk when SAVE_FIGURES = True.
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
-PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop/Jupyter fallback
+PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
 # --- I/O ----------------------------------------------------------------------
 OUTPUT_DIR: str = ""
@@ -784,7 +784,7 @@ def _project_element_field_to_nodes(mesh, values):
 def _show_blocking_figure(fig, message=None):
     """
     On Android / PyDroid: never open an interactive window – just close the figure.
-    On desktop / Jupyter : keep the previous interactive behaviour with timeout.
+    On desktop: keep the previous interactive behaviour with timeout.
     """
     if not SHOW_PLOTS:
         plt.close(fig)
@@ -798,7 +798,7 @@ def _show_blocking_figure(fig, message=None):
         plt.close(fig)
         return
 
-    # ---------- Desktop / Jupyter interactive path ----------
+    # ---------- Desktop interactive path ----------
     if message:
         print(message)
 
