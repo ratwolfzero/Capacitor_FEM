@@ -19,6 +19,7 @@ from typing import ClassVar
 
 import numpy as np
 import matplotlib
+import matplotlib.pyplot as plt
 # ── backend selection MUST happen here, before pyplot ─────────────
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
@@ -36,13 +37,13 @@ def _is_android() -> bool:
 
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
-        #matplotlib.use("Agg")
+        matplotlib.use("Agg")
         print("Android/PyDroid detected → Agg backend (save-only mode)")
         sys.stdout.flush()
     except Exception:
         pass
 # ── now it is safe to import pyplot ───────────────────────────────
-import matplotlib.pyplot as plt
+
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
