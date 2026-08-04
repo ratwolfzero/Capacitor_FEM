@@ -48,6 +48,12 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
+import builtins
+_original_print = builtins.print
+def print(*args, **kwargs):
+    kwargs.setdefault("flush", True)
+    _original_print(*args, **kwargs)
+
 
 # =============================================================================
 # 0. Runtime switches and tuning
