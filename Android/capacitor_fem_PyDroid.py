@@ -119,14 +119,14 @@ def _is_android() -> bool:
     except Exception:
         return False
 
-
+"""
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
         print("Android/PyDroid detected → Agg backend (save-only mode)")
     except Exception:
         pass
-
+"""
 
 # =============================================================================
 # 1. PHYSICS CONSTANTS
