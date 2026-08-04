@@ -36,7 +36,7 @@ def _is_android() -> bool:
 
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
-        matplotlib.use("Agg")
+        #matplotlib.use("Agg")
         print("Android/PyDroid detected → Agg backend (save-only mode)")
         sys.stdout.flush()
     except Exception:
@@ -47,12 +47,6 @@ import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
-
-import builtins
-_original_print = builtins.print
-def print(*args, **kwargs):
-    kwargs.setdefault("flush", True)
-    _original_print(*args, **kwargs)
 
 
 # =============================================================================
