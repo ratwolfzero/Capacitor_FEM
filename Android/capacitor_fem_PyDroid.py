@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
-import matplotlib
+
 
 # ── backend selection MUST happen here, before pyplot ─────────────
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
