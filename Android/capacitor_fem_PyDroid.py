@@ -19,6 +19,28 @@ from typing import ClassVar
 
 import numpy as np
 import matplotlib
+# ── backend selection MUST happen here, before pyplot ─────────────
+FORCE_SAVE_ONLY_ON_ANDROID: bool = True
+
+def _is_android() -> bool:
+    try:
+        return (
+            "ANDROID" in os.environ
+            or "ANDROID_ROOT" in os.environ
+            or "ANDROID_DATA" in os.environ
+            or "pydroid" in sys.executable.lower()
+            or os.path.exists("/system/build.prop")
+        )
+    except Exception:
+        return False
+
+if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
+    try:
+        matplotlib.use("Agg")
+        print("Android/PyDroid detected → Agg backend (save-only mode)")
+    except Exception:
+        pass
+# ── now it is safe to import pyplot ───────────────────────────────
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
@@ -52,11 +74,6 @@ VERBOSE_CONVERGENCE_NOTES: bool = False
 
 PLOT_CONVERGENCE: bool = True
 """After both examples, draw a combined convergence figure."""
-
-# --- Android / mobile robustness ---------------------------------------------
-# On PyDroid / Android we never try to open interactive plot windows.
-# Figures are always written to disk when SAVE_FIGURES = True.
-FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
