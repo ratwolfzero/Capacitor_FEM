@@ -19,7 +19,7 @@ from typing import ClassVar
 
 import numpy as np
 import matplotlib
-import matplotlib.pyplot as plt
+
 # ── backend selection MUST happen here, before pyplot ─────────────
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
@@ -45,7 +45,7 @@ if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
         pass
 # ── now it is safe to import pyplot ───────────────────────────────
 """
-
+import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
