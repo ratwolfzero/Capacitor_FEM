@@ -38,6 +38,7 @@ if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
         print("Android/PyDroid detected → Agg backend (save-only mode)")
+        sys.stdout.flush()
     except Exception:
         pass
 # ── now it is safe to import pyplot ───────────────────────────────
