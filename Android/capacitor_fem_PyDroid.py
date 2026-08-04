@@ -6,7 +6,6 @@ The current implementation status, historical changes, limitations, and future
 work are documented in README.md.
 
 This version includes robustness improvements for:
-  - Jupyter / Carnets Jupyter (iOS)
   - PyDroid3 on Android
 """
 
