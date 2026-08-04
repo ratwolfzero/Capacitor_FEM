@@ -13,7 +13,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.colors as mcolors
-import matplotlib
+
 import matplotlib.pyplot as plt
 import os
 import sys
@@ -42,7 +42,7 @@ def _is_android() -> bool:
     except Exception:
         return False
 
-
+import matplotlib
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
