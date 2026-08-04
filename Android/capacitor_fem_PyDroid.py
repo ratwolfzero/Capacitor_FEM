@@ -35,7 +35,7 @@ def _is_android() -> bool:
         )
     except Exception:
         return False
-"""
+
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
@@ -44,7 +44,7 @@ if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     except Exception:
         pass
 # ── now it is safe to import pyplot ───────────────────────────────
-"""
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
