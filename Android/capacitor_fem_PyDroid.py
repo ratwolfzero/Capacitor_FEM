@@ -13,6 +13,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.colors as mcolors
+import matplotlib
 import matplotlib.pyplot as plt
 import os
 import sys
