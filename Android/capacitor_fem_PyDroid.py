@@ -13,7 +13,6 @@ import os
 import sys
 import time
 import warnings
-import platform
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
