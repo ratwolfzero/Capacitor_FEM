@@ -1,4 +1,4 @@
-# Pydroid run terminal
+#Pydroid run terminal
 """
 Two-dimensional finite-element electrostatics solver.
 
@@ -9,12 +9,6 @@ This version includes robustness improvements for:
   - PyDroid3 on Android
 """
 
-from scipy.sparse.linalg import spsolve
-from scipy.sparse import csr_matrix
-from scipy.interpolate import RegularGridInterpolator
-import matplotlib.colors as mcolors
-
-import matplotlib.pyplot as plt
 import os
 import sys
 import time
@@ -24,32 +18,12 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
-
-
-# ── backend selection MUST happen here, before pyplot ─────────────
-FORCE_SAVE_ONLY_ON_ANDROID: bool = True
-
-
-def _is_android() -> bool:
-    try:
-        return (
-            "ANDROID" in os.environ
-            or "ANDROID_ROOT" in os.environ
-            or "ANDROID_DATA" in os.environ
-            or "pydroid" in sys.executable.lower()
-            or os.path.exists("/system/build.prop")
-        )
-    except Exception:
-        return False
-
 import matplotlib
-if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
-    try:
-        matplotlib.use("Agg")
-        print("Android/PyDroid detected → Agg backend (save-only mode)")
-    except Exception:
-        pass
-# ── now it is safe to import pyplot ───────────────────────────────
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from scipy.interpolate import RegularGridInterpolator
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import spsolve
 
 
 # =============================================================================
@@ -78,6 +52,11 @@ VERBOSE_CONVERGENCE_NOTES: bool = False
 
 PLOT_CONVERGENCE: bool = True
 """After both examples, draw a combined convergence figure."""
+
+# --- Android / mobile robustness ---------------------------------------------
+# On PyDroid / Android we never try to open interactive plot windows.
+# Figures are always written to disk when SAVE_FIGURES = True.
+FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
@@ -110,26 +89,43 @@ class GradedMeshTuning:
     edge_band_width_factor: float = 4.0           # width of refined zone at plate ends
     edge_band_width_min_m: float = 1.5e-3         # minimum absolute width [m]
     margin_spacing_factor: float = 2.0            # coarsen margins by this factor
-    # refine edge bands by this factor
-    edge_spacing_factor: float = 0.5
+    edge_spacing_factor: float = 0.5              # refine edge bands by this factor
     interior_spacing_factor: float = 1.2          # slightly coarsen plate interior
-    # spacing through conductor plates
-    plate_spacing_factor: float = 0.8
+    plate_spacing_factor: float = 0.8             # spacing through conductor plates
     gap_spacing_factor: float = 0.45              # finest spacing through the gap
     min_margin_points: int = 4                    # floor on points in each margin
     min_edge_points: int = 6                      # floor on points in each edge band
-    # floor on points in plate interior
-    min_interior_points: int = 8
+    min_interior_points: int = 8                  # floor on points in plate interior
     min_plate_points: int = 4                     # floor on points through a plate
     min_gap_points: int = 10                      # floor on points through the gap
-    # floor when plate is too narrow for edge bands
-    min_fallback_interior_points: int = 4
-    # spacing factor used in that fallback
-    fallback_interior_spacing_factor: float = 1.0
+    min_fallback_interior_points: int = 4         # floor when plate is too narrow for edge bands
+    fallback_interior_spacing_factor: float = 1.0 # spacing factor used in that fallback
 
 
 # Instantiate with defaults.  Replace this line to tweak globally:
 GRADED_MESH_DEFAULTS: GradedMeshTuning = GradedMeshTuning()
+
+
+def _is_android() -> bool:
+    """Best-effort detection of Android / PyDroid."""
+    try:
+        return (
+            "ANDROID" in os.environ
+            or "ANDROID_ROOT" in os.environ
+            or "ANDROID_DATA" in os.environ
+            or "pydroid" in sys.executable.lower()
+            or os.path.exists("/system/build.prop")
+        )
+    except Exception:
+        return False
+
+
+if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
+    try:
+        matplotlib.use("Agg")
+        print("Android/PyDroid detected → Agg backend (save-only mode)")
+    except Exception:
+        pass
 
 
 # =============================================================================
@@ -815,8 +811,7 @@ def _show_blocking_figure(fig, message=None):
     t0 = time.time()
     while plt.fignum_exists(fig.number):
         if time.time() - t0 > PLOT_WAIT_TIMEOUT_S:
-            print(
-                f"(Plot wait timed out after {PLOT_WAIT_TIMEOUT_S:.0f}s – continuing)")
+            print(f"(Plot wait timed out after {PLOT_WAIT_TIMEOUT_S:.0f}s – continuing)")
             break
         try:
             fig.canvas.flush_events()
@@ -1169,8 +1164,7 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     plate_w = d["plate_w_max"]
     x_plate0 = d["x_plate0"]
 
-    edge_band = max(tune.edge_band_width_factor *
-                    h, tune.edge_band_width_min_m)
+    edge_band = max(tune.edge_band_width_factor * h, tune.edge_band_width_min_m)
     n_margin_x = max(tune.min_margin_points,
                      round(d["margin"] / (tune.margin_spacing_factor * h)) + 1)
     n_edge = max(tune.min_edge_points,
@@ -1315,8 +1309,7 @@ def example_parallel_plate(config=None):
         print(f"mesh: {graded['mesh'].n_nodes} nodes, {graded['mesh'].n_tris} triangles "
               f"(graded, nominal h = {graded['h']*1e3:.3f} mm)")
         print(f"FEM capacitance (graded)  : {C_graded*1e12:9.3f} pF/m")
-        print(
-            f"Delta vs uniform          : {100*(C_graded-C_uniform)/C_uniform:+.2f} %")
+        print(f"Delta vs uniform          : {100*(C_graded-C_uniform)/C_uniform:+.2f} %")
         print("Capacitance is per unit depth into the page; multiply by the actual "
               "plate depth in meters for total farads.")
 
@@ -1387,8 +1380,7 @@ def example_coax(config=None):
     print("=" * 72)
 
     print("Mesh convergence (smooth circular boundary, no sharp corner):")
-    print(
-        f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'error':>9s}")
+    print(f"{'h [mm]':>9s}{'nodes':>9s}{'solve [s]':>11s}{'C [pF/m]':>12s}{'error':>9s}")
     results = [_solve_coax(config, h) for h in config.convergence_spacings]
     C_values = []
     for result in results:
@@ -1424,8 +1416,7 @@ def _solve_exact_check(config, h):
     """Full-width-plate variant: fringing is geometrically impossible."""
     plate_t, gap, dielectric_t, margin = _snap_plate_dims(config, h)
 
-    Lx = snap_to_grid(max(config.bottom_plate_width,
-                      config.top_plate_width), h)
+    Lx = snap_to_grid(max(config.bottom_plate_width, config.top_plate_width), h)
     Ly = 2 * plate_t + gap + 2 * margin
     nx = round(Lx / h) + 1
     ny = round(Ly / h) + 1
