@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 # ── backend selection MUST happen here, before pyplot ─────────────
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
-"""
+
 def _is_android() -> bool:
     try:
         return (
@@ -35,7 +35,7 @@ def _is_android() -> bool:
         )
     except Exception:
         return False
-
+"""
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     try:
         matplotlib.use("Agg")
