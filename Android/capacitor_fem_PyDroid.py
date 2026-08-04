@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy.interpolate import RegularGridInterpolator
