@@ -123,26 +123,7 @@ class GradedMeshTuning:
 GRADED_MESH_DEFAULTS: GradedMeshTuning = GradedMeshTuning()
 
 
-def _is_android() -> bool:
-    """Best-effort detection of Android / PyDroid."""
-    try:
-        return (
-            "ANDROID" in os.environ
-            or "ANDROID_ROOT" in os.environ
-            or "ANDROID_DATA" in os.environ
-            or "pydroid" in sys.executable.lower()
-            or os.path.exists("/system/build.prop")
-        )
-    except Exception:
-        return False
 
-
-if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
-    try:
-        matplotlib.use("Agg")
-        print("Android/PyDroid detected → Agg backend (save-only mode)")
-    except Exception:
-        pass
 
 
 # =============================================================================
