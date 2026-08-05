@@ -120,19 +120,38 @@ def _is_android() -> bool:
 
 
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
-    # PyDroid3 already runs headless; _show_blocking_figure handles the rest.
+    # PyDroid itself is not headless (it has its own plot-viewer UI); we
+    # simply never call plt.show(), so figure *handling* is headless by
+    # construction regardless of which backend gets resolved below.
+    # _show_blocking_figure() enforces this on every call.
     print("Android/PyDroid detected → save-only mode")
-    
+    print(f"matplotlib backend in use: {plt.get_backend()}")
+
 # On Android/PyDroid we intentionally do NOT force the Agg backend.
 #
-# Although Agg is suitable for headless rendering, switching backends must
-# happen before importing matplotlib.pyplot. More importantly, our Android
-# code path never calls plt.show(): figures are saved via fig.savefig() and
-# closed immediately. This preserves normal console output while avoiding
-# the GUI event loop on PyDroid.
+# We don't need to: this Android code path never calls plt.show(), so no
+# GUI event loop is entered regardless of which backend is active, and
+# fig.savefig() renders PNG output through Agg internally no matter what
+# backend is nominally loaded. "Headless" here comes from never calling
+# show(), not from which backend is set.
 #
-# If true headless operation is ever required, Agg can be enabled *before*
-# importing matplotlib.pyplot.
+# Forcing it has also proven actively harmful on-device. PyDroid's own
+# "#Pydroid run terminal" mode (declared at the top of this file) already
+# configures the runtime for terminal-only execution before the script
+# starts; explicitly re-calling matplotlib.use("Agg") on top of that has
+# been observed, repeatably, to desync whatever hook PyDroid uses to
+# coordinate console output with its plot-viewer indicator: stdout stops
+# appearing and an empty plot pane shows anyway. The exact mechanism lives
+# inside PyDroid's closed-source runtime and is unconfirmed, but the
+# on-device result is consistent.
+#
+# (Backend switching "must" happen before importing pyplot is the safe
+# traditional convention, not a hard requirement in current matplotlib —
+# moot here regardless, since we never switch.)
+#
+# If true headless operation is ever needed outside PyDroid (e.g. running
+# under plain `python` with no display), Agg can still be enabled *before*
+# importing matplotlib.pyplot:
 #
 # try:
 #     matplotlib.use("Agg")
@@ -803,9 +822,9 @@ def _show_blocking_figure(fig, message=None):
 
     # ---------- Pure save-only path for Android ----------
     if on_android and FORCE_SAVE_ONLY_ON_ANDROID:
-        # Saving already happened in plot_solution / plot_convergence_study
-        plt.close(fig)
-        return
+            # Saving already happened in plot_solution / plot_convergence_study
+            plt.close(fig)
+            return
 
     # ---------- Desktop interactive path ----------
     if message:
