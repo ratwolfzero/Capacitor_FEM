@@ -56,7 +56,7 @@ PLOT_CONVERGENCE: bool = True
 # True  (default): never call plt.show() on Android/PyDroid — pure save-only.
 # False: runs the desktop show+timeout path; still no usable window on device,
 #        only extra console noise. PNGs are written either way (SAVE_FIGURES).
-FORCE_SAVE_ONLY_ON_ANDROID: bool = True
+FORCE_SAVE_ONLY_ON_ANDROID: bool = False
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
