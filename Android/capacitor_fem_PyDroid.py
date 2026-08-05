@@ -53,8 +53,9 @@ PLOT_CONVERGENCE: bool = True
 """After both examples, draw a combined convergence figure."""
 
 # --- Android / mobile robustness ---------------------------------------------
-# On PyDroid / Android we never try to open interactive plot windows.
-# Figures are always written to disk when SAVE_FIGURES = True.
+# True  (default): never call plt.show() on Android/PyDroid — pure save-only.
+# False: runs the desktop show+timeout path; still no usable window on device,
+#        only extra console noise. PNGs are written either way (SAVE_FIGURES).
 FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
