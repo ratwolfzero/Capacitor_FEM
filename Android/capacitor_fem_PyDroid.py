@@ -121,15 +121,23 @@ def _is_android() -> bool:
 
 if FORCE_SAVE_ONLY_ON_ANDROID and _is_android():
     # PyDroid3 already runs headless; _show_blocking_figure handles the rest.
-    if _is_android():
-       print("Android/PyDroid detected → save-only mode")
-"""
-    try:
-        matplotlib.use("Agg")
-        print("Android/PyDroid detected → Agg backend (save-only mode)")
-    except Exception:
-        pass
-"""
+    print("Android/PyDroid detected → save-only mode")
+    
+# On Android/PyDroid we intentionally do NOT force the Agg backend.
+#
+# Although Agg is suitable for headless rendering, switching backends must
+# happen before importing matplotlib.pyplot. More importantly, our Android
+# code path never calls plt.show(): figures are saved via fig.savefig() and
+# closed immediately. This preserves normal console output while avoiding
+# the GUI event loop on PyDroid.
+#
+# If true headless operation is ever required, Agg can be enabled *before*
+# importing matplotlib.pyplot.
+#
+# try:
+#     matplotlib.use("Agg")
+# except Exception:
+#     pass
 
 # =============================================================================
 # 1. PHYSICS CONSTANTS
