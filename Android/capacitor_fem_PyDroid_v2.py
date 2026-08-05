@@ -55,7 +55,7 @@ PLOT_CONVERGENCE: bool = True
 # --- Android / mobile robustness ---------------------------------------------
 # On PyDroid / Android we never try to open interactive plot windows.
 # Figures are always written to disk when SAVE_FIGURES = True.
-FORCE_SAVE_ONLY_ON_ANDROID: bool = False
+FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
