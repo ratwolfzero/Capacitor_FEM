@@ -6,7 +6,7 @@ The current implementation status, historical changes, limitations, and future
 work are documented in README.md.
 
 This version includes robustness improvements for:
-  - PyDroid3 on Android
+  - Pydroid 3 on Android
 """
 
 import os

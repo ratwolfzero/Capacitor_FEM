@@ -617,7 +617,7 @@ The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plo
 
 This version includes robustness improvements for:
 
-- PyDroid3 on AndroidSee
+- Pydroid 3
 
 --> See Android Folder
 
