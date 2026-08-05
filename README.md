@@ -119,6 +119,8 @@ its development history, known limitations, and future work.
   - [6. Installation](#6-installation)
   - [7. Usage](#7-usage)
     - [7.1 Running the Examples](#71-running-the-examples)
+    - [7.1.1 Jupyter](#711-jupyter)
+    - [7.1.2 Android / Pydroid](#712-android--pydroid)
     - [7.2 Quick Start](#72-quick-start)
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
   - [8. Validation and Verification](#8-validation-and-verification)
@@ -606,8 +608,18 @@ backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
 introduce close lag. If a window is put into full-screen with the
 green traffic-light button, exit with **Ctrl+F**.
 
+### 7.1.1 Jupyter
+
 Jupyter / Carnets (iOS) note
 The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
+
+### 7.1.2 Android / Pydroid
+
+This version includes robustness improvements for:
+
+- PyDroid3 on AndroidSee
+
+--> See Android Folder
 
 ### 7.2 Quick Start
 
