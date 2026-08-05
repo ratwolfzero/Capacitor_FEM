@@ -55,7 +55,7 @@ PLOT_CONVERGENCE: bool = True
 # --- Android / mobile robustness ---------------------------------------------
 # On PyDroid / Android we never try to open interactive plot windows.
 # Figures are always written to disk when SAVE_FIGURES = True.
-FORCE_SAVE_ONLY_ON_ANDROID: bool = False
+FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
@@ -822,14 +822,9 @@ def _show_blocking_figure(fig, message=None):
 
     # ---------- Pure save-only path for Android ----------
     if on_android and FORCE_SAVE_ONLY_ON_ANDROID:
-        # Saving already happened in plot_solution / plot_convergence_study,
-        # *if* SAVE_FIGURES was True. If it wasn't, this branch would
-        # otherwise discard the figure with zero output and no warning.
-        if not SAVE_FIGURES:
-            print("Note: figure computed but neither saved nor shown "
-                  "(SAVE_FIGURES=False on Android).")
-        plt.close(fig)
-        return
+            # Saving already happened in plot_solution / plot_convergence_study
+            plt.close(fig)
+            return
 
     # ---------- Desktop interactive path ----------
     if message:
