@@ -215,7 +215,7 @@ $$0 = \oint_{\partial\Omega} w\,\varepsilon\,\frac{\partial V}{\partial n}\,ds \
 Restricting $w$ to functions that vanish on the Dirichlet (conductor) boundaries
 eliminates that part of the boundary integral. No flux condition is imposed on the
 remaining outer domain boundary — this is the weak form's *natural* boundary
-condition, corresponding physically to zero prescribed normal displacement there.
+condition, corresponding physically to zero prescribed normal component of $\mathbf{D}$ there.
 What remains is the weak form the solver assembles:
 
 $$\int_\Omega \varepsilon\,\nabla w\cdot\nabla V\,dA = 0 \qquad \text{for every admissible } w$$
@@ -408,8 +408,7 @@ $1/h^2$ — halving $h$ quadruples the mesh, everywhere, whether or not the fiel
 actually needs that resolution there. Combined with `apply_conductors_and_solve`
 calling `scipy.sparse.linalg.spsolve` — a general (non-symmetric) sparse LU
 factorization, even though the underlying stiffness matrix is symmetric
-positive definite — peak memory was measured to grow *faster* than linear in
-node count:
+positive definite — peak RSS was measured and fitted to a power law in node count:
 
 |       $h$ |   nodes | measured peak RSS |
 | --------: | ------: | ----------------: |
@@ -970,9 +969,8 @@ and don't change accuracy at all:
   `gmsh` isn't: it's a new native dependency.
 
 - **Iterative solver.** Since the matrix is SPD, conjugate gradient is a valid
-  alternative to a direct solve, with memory that scales with problem size
-  directly rather than the superlinear growth measured in §4.6 (no
-  factorization fill-in). A real trade-off, not a strict improvement: unlike
+  alternative to a direct solve, with memory that scales roughly linearly with problem size
+  (no factorization fill-in). A real trade-off, not a strict improvement: unlike
   the current one-shot, exact direct solve, CG needs a convergence tolerance
   and, without a decent preconditioner, can converge slowly or unpredictably on
   this kind of problem — swapping it in naively could trade a clear memory
