@@ -75,6 +75,38 @@ edge_band = max(edge_band, edge_radius + edge_band_width_factor · h)
 so the curved region isn't left in coarse interior spacing. Feeds unchanged
 into the existing narrow-plate fallback (`plate_w ≤ 2·edge_band`).
 
+## Known limitations: reading the `|E|` panel
+
+Two things worth knowing before comparing field plots or peak-field numbers
+across sharp vs. rounded runs. Neither is new in this delta — both are
+pre-existing characteristics of `plot_solution` / the underlying mesh — but
+`edge_radius` is what makes cross-run comparison worth doing, so they're
+easy to trip over now.
+
+**Colorbar is per-plot, not absolute.** The `|E|` panel calls
+`ax.pcolormesh(X, Y, EmagG_masked, ...)` with no `vmin`/`vmax`, so each
+figure autoscales to *its own* peak. Two saved PNGs are not visually
+comparable — an unchanged interior value can render a different color
+purely because the *other* run's peak (and hence its scale) moved. Compare
+`result["C"]` or explicit sampled field values, never colorbar hue, across
+runs.
+
+**Peak `|E|` at a plate edge — sharp or rounded — is not mesh-converged at
+the spacings this file uses.** A sharp 90° conductor corner has a genuine
+continuum-field singularity, `E ~ r^-1/3` (the classic Motz-problem exponent
+for its 270° reentrant field angle); its FEM-reported peak grows without
+bound as `h` shrinks and never settles — default-size plate,
+`edge_radius=0`: 46.3 → 56.3 → 59.8 → 69.0 → 85.7 kV/m for
+h = 0.4/0.2/0.15/0.1/0.05 mm, fitted exponent −0.31 vs. theoretical −1/3. A
+rounded corner has a genuine finite limit, but this structured-grid mesh
+represents the arc only through node membership (no local 2-D refinement
+there), so it approaches that limit slowly and non-monotonically — same
+plate, `edge_radius=0.5mm`: 52.5 → 56.3 → 55.9 → 59.7 → 62.3 kV/m over the
+same five spacings, roughly 5× less sensitive than the sharp case at the
+finest step but not settled. Trust `C`, `C_ideal`, and field values away
+from plate edges (Verification #6); treat any near-edge peak reading as
+order-of-magnitude only.
+
 ## Out of scope
 
 - Dielectric slab stays a plain `Rectangle` (unrounded).
@@ -97,6 +129,11 @@ into the existing narrow-plate fallback (`plate_w ≤ 2·edge_band`).
 5. **End-to-end**: 1mm plate, 0.45mm fillet — fillets confirmed in all four
    plot panels; FEM-vs-ideal excess (fringing + corner concentration) fell
    from +28.7% (sharp) to +26.7% (rounded) at identical `h`.
+6. **Bulk-field invariance**: sampled `|E|` at plate center and 5–7mm in
+   from either edge, in both the dielectric and air-gap layers,
+   `edge_radius=0` vs `0.5mm` at `h=0.1mm` (default finest spacing) — agree
+   to ≤0.015%, and both match the ideal 1D series-capacitor formula to
+   ~0.001%. Rounding the edges doesn't perturb the field away from them.
 
 ## Usage
 
