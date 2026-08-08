@@ -14,7 +14,7 @@ import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 import numpy as np
@@ -236,7 +236,7 @@ class ParallelPlateConfig(_AutoSpacingConfig):
     dielectric_thickness: float = 2e-3
     bottom_plate_width: float = 24e-3
     top_plate_width: float = 24e-3
-    edge_radius: float = 0.0005
+    edge_radius: float = 0.0
     domain_margin: float = 15e-3
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5
@@ -1384,6 +1384,21 @@ def _solve_parallel_plate(config, h, use_graded=False):
     V, is_fixed, solve_time = apply_conductors_and_solve(mesh, K, conductors)
     Ex, Ey, Emag, Dx, Dy, energy_density, W = compute_fields(
         mesh, V, eps_elem, b, c, area, area2)
+
+    # Free-space |E| peak, computed with the exact same node-projection
+    # plot_solution's panel uses (component-wise projection, then
+    # magnitude -- not the same as projecting Emag directly) so this value
+    # always matches what that panel would render, and can be reused as a
+    # shared emag_vmax across separate plot_solution() calls without the
+    # caller re-deriving the field themselves.
+    Ex_nodes = _project_element_field_to_nodes(mesh, Ex)
+    Ey_nodes = _project_element_field_to_nodes(mesh, Ey)
+    Emag_nodes = np.hypot(Ex_nodes, Ey_nodes)
+    node_in_conductor = np.zeros(mesh.n_nodes, dtype=bool)
+    for cond in conductors:
+        node_in_conductor |= cond.contains(mesh.points[:, 0], mesh.points[:, 1])
+    emag_peak = float(Emag_nodes[~node_in_conductor].max())
+
     C = capacitance_from_energy(W, config.voltage, 0.0)
     overlap_w = min(d["bottom_w"], d["top_w"])
     C_ideal = (overlap_w * EPS0 /
@@ -1392,7 +1407,8 @@ def _solve_parallel_plate(config, h, use_graded=False):
 
     result = dict(h=h, mesh=mesh, conductors=conductors, eps_r_of_xy=eps_r_of_xy,
                   V=V, is_fixed=is_fixed, energy_density=energy_density,
-                  Ex=Ex, Ey=Ey, C=C, C_ideal=C_ideal, solve_time=solve_time, graded=use_graded)
+                  Ex=Ex, Ey=Ey, emag_peak=emag_peak, C=C, C_ideal=C_ideal,
+                  solve_time=solve_time, graded=use_graded)
     result.update(d)
     return result
 
@@ -1491,6 +1507,80 @@ def example_parallel_plate(config=None):
                         uniform["margin"] + config.plot_margin
                         + 2 * uniform["plate_t"] + uniform["gap"]))
     return C_uniform, C_ideal, results, None
+
+
+def compare_parallel_plate_edge_treatments(config, edge_radius=None, h=None,
+                                           use_graded=True,
+                                           fname_prefix="compare_edges"):
+    """Solve `config` twice -- sharp plate edges (edge_radius=0) and rounded
+    (edge_radius=`edge_radius`) -- holding every other parameter fixed, and
+    plot both on one shared |E| color scale.
+
+    Without this, each plot_solution() call autoscales its own |E| panel to
+    its own peak, so the same interior field can render a different color
+    purely because the OTHER run's peak moved (see DELTA_rounded_edges.md,
+    "Known limitations", for why). This does the comparison in one call:
+    solve both, take the shared max of result["emag_peak"], pass it as
+    emag_vmax to both plot_solution() calls.
+
+    edge_radius defaults to the largest radius this geometry allows,
+    0.5 * min(plate_thickness, bottom_plate_width, top_plate_width). h
+    defaults to config.mesh_spacing. Any edge_radius already set on `config`
+    is ignored -- this function sets it explicitly on each copy so the two
+    runs differ in exactly that one parameter (via dataclasses.replace,
+    every other field -- thickness, gap, widths, voltage, dielectric,
+    mesh_spacing, ... -- stays identical between them).
+
+    Returns (result_sharp, result_rounded), each the dict
+    _solve_parallel_plate() returns (now including "emag_peak").
+    """
+    if edge_radius is None:
+        edge_radius = 0.5 * min(config.plate_thickness,
+                                config.bottom_plate_width,
+                                config.top_plate_width)
+    h = config.mesh_spacing if h is None else h
+
+    cfg_sharp = replace(config, edge_radius=0.0)
+    cfg_rounded = replace(config, edge_radius=edge_radius)
+
+    r_sharp = _solve_parallel_plate(cfg_sharp, h, use_graded=use_graded)
+    r_rounded = _solve_parallel_plate(cfg_rounded, h, use_graded=use_graded)
+
+    shared_vmax = max(r_sharp["emag_peak"], r_rounded["emag_peak"])
+    mesh_label = "graded mesh" if use_graded else "uniform mesh"
+
+    # bounding box is identical for both (rounding only cuts into corners,
+    # never changes plate_w / margin / plate_t / gap), so either result's
+    # dims give the same frame for both plots
+    xlim = (r_sharp["x_plate0"] - config.plot_margin,
+           r_sharp["x_plate0"] + r_sharp["plate_w"] + config.plot_margin)
+    ylim = (r_sharp["margin"] - config.plot_margin,
+           r_sharp["margin"] + config.plot_margin
+           + 2 * r_sharp["plate_t"] + r_sharp["gap"])
+
+    print("=" * 72)
+    print("Sharp vs. rounded plate edges, shared |E| color scale")
+    print("=" * 72)
+    print(f"  edge_radius: 0 mm (sharp)  vs  {edge_radius * 1e3:.3f} mm (rounded)")
+    print(f"  h = {h * 1e3:.3f} mm, {mesh_label}")
+    print(f"  C:        sharp = {r_sharp['C'] * 1e12:9.4f} pF/m   "
+         f"rounded = {r_rounded['C'] * 1e12:9.4f} pF/m")
+    print(f"  |E| peak: sharp = {r_sharp['emag_peak']:9.1f} V/m    "
+         f"rounded = {r_rounded['emag_peak']:9.1f} V/m")
+    print(f"  shared color scale: 0 to {shared_vmax:.1f} V/m")
+
+    for label, r in (("sharp", r_sharp), ("rounded", r_rounded)):
+        radius_mm = 0.0 if label == "sharp" else edge_radius * 1e3
+        edge_desc = "sharp" if radius_mm == 0.0 else f"r={radius_mm:.3f} mm"
+        fname = os.path.join(OUTPUT_DIR, f"{fname_prefix}_{label}.png")
+        plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
+                     r["conductors"], r["is_fixed"],
+                     f"Parallel-plate capacitor, {edge_desc} edges — {mesh_label}",
+                     fname, Ex=r["Ex"], Ey=r["Ey"], xlim=xlim, ylim=ylim,
+                     emag_vmin=0.0, emag_vmax=shared_vmax)
+        print(f"  saved: {fname}")
+
+    return r_sharp, r_rounded
 
 
 def _solve_coax(config, h):

@@ -13,6 +13,8 @@ identical to the pre-delta file — see *Verification*.
 | §10 `_build_graded_parallel_plate_mesh` | — | widens `edge_band` to cover the fillet |
 | §10 `example_parallel_plate` | — | prints edge treatment; plot titles note radius when > 0 |
 | §9 `plot_solution` | `emag_vmin`, `emag_vmax` | new optional params, default `None` (unchanged autoscale). **General plotting utility, not rounded-edges-specific** — added so two separate calls (e.g. sharp vs. rounded) can share one `|E|` color scale; see *Known limitations* and *Usage*. |
+| §10 `_solve_parallel_plate` | `emag_peak` | new dict key: free-space `\|E\|` peak, via the same node-projection `plot_solution` uses for its panel — always matches what's actually rendered. |
+| §10 `compare_parallel_plate_edge_treatments` | — | new function: one call solves sharp vs. rounded (everything else identical) and plots both on a shared `\|E\|` scale — see *Usage*. |
 
 **Untouched:** `Mesh`, `assemble_stiffness`, `apply_conductors_and_solve`,
 `compute_fields`, `plot_solution`, `example_coax`, `_solve_exact_check`,
@@ -88,8 +90,10 @@ without `edge_radius`:**
   comparable; an unchanged value can render a different color purely
   because the *other* run's scale moved. Compare `result["C"]` or sampled
   field values, never colorbar hue. **Now fixable:**
-  `plot_solution(..., emag_vmin=, emag_vmax=)` (both default `None`,
-  unchanged) lets two calls share one scale — see *Usage*.
+  `compare_parallel_plate_edge_treatments(config)` runs both cases and
+  plots them on one shared scale automatically; or call
+  `plot_solution(..., emag_vmin=, emag_vmax=)` directly for a custom
+  comparison — see *Usage*.
 - **A sharp 90° conductor corner is a true field singularity**
   (`E ~ r^-1/3`, the Motz-problem exponent for its 270° reentrant angle),
   present in every rectangular plate before `edge_radius` existed. Its
@@ -155,6 +159,16 @@ or rounded — as order-of-magnitude only.
    interior rendering identically in both (difference correctly localized
    to the corners); confirmed a full `example_parallel_plate()` call with
    no override reproduces the pre-addition output byte-for-byte.
+8. **`compare_parallel_plate_edge_treatments`**: confirmed it ignores any
+   `edge_radius` already set on the input config, instead using `0.0` and
+   the requested/default radius on two independent copies made via
+   `dataclasses.replace` (every other field held identical); confirmed the
+   default radius equals `0.5·min(plate_thickness, bottom_plate_width,
+   top_plate_width)`; confirmed `_solve_parallel_plate`'s new `emag_peak`
+   key still reproduces byte-for-byte identical `example_parallel_plate()`
+   output (adding a dict key doesn't touch anything `plot_solution`
+   consumes); ran end-to-end and confirmed both saved plots share one
+   colorbar range.
 
 ## Usage
 
@@ -163,28 +177,20 @@ config = ParallelPlateConfig(edge_radius=0.4e-3)  # 0.4 mm fillet, both plates
 C, C_ideal, results, graded = example_parallel_plate(config)
 ```
 
-**Comparable-scale sharp vs. rounded plots** (see *Known limitations*):
+**Comparable-scale sharp vs. rounded plots** (see *Known limitations*) —
+one call, everything else about `config` held identical between the two runs:
 
 ```python
-import numpy as np
+r_sharp, r_rounded = compare_parallel_plate_edge_treatments(config)
 
-def emag_peak(result):
-    mesh = result["mesh"]
-    X, Y = np.meshgrid(mesh.xs, mesh.ys)
-    dVdy, dVdx = np.gradient(result["V"].reshape(mesh.ny, mesh.nx), mesh.ys, mesh.xs)
-    Emag = np.hypot(dVdx, dVdy)
-    cond = np.zeros_like(X, dtype=bool)
-    for c in result["conductors"]:
-        cond |= c.contains(X, Y)
-    return np.ma.masked_where(cond, Emag).max()
-
-h = 0.1e-3
-r_sharp   = _solve_parallel_plate(ParallelPlateConfig(edge_radius=0.0),    h, use_graded=True)
-r_rounded = _solve_parallel_plate(ParallelPlateConfig(edge_radius=0.4e-3), h, use_graded=True)
-shared_vmax = max(emag_peak(r_sharp), emag_peak(r_rounded))
-
-for label, r in [("sharp", r_sharp), ("rounded", r_rounded)]:
-    plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
-                 r["conductors"], r["is_fixed"], f"{label} edges", f"{label}.png",
-                 Ex=r["Ex"], Ey=r["Ey"], emag_vmin=0.0, emag_vmax=shared_vmax)
+# or with an explicit radius / mesh spacing / uniform mesh:
+r_sharp, r_rounded = compare_parallel_plate_edge_treatments(
+    config, edge_radius=0.4e-3, h=0.1e-3, use_graded=False)
 ```
+
+Prints both `C` and `emag_peak`, saves `compare_edges_sharp.png` and
+`compare_edges_rounded.png` (or `fname_prefix=...`) to `OUTPUT_DIR`, and
+returns both result dicts for further use. Drop to
+`plot_solution(..., emag_vmin=, emag_vmax=)` directly only if you need a
+comparison this function doesn't cover (e.g. two configs that differ in
+more than `edge_radius`).
