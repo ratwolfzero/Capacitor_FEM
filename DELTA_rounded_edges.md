@@ -5,16 +5,16 @@ identical to the pre-delta file — see *Verification*.
 
 ## Changed
 
-| Section                                 | Symbol                            | Change                                                                                                                                                                                                                                            |
-| --------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §3 GEOMETRY                             | `RoundedRectangle(Shape)`         | new class                                                                                                                                                                                                                                         |
-| §2 CONFIGURATION                        | `ParallelPlateConfig.edge_radius` | new field, `float = 0.0`, + `__post_init__` bound                                                                                                                                                                                                 |
-| §10 `_build_parallel_plate_geometry`    | —                                 | emits `RoundedRectangle` instead of `Rectangle` for both plates when radius > 0; re-clamps radius to snapped dims; adds `dims["edge_radius"]`                                                                                                     |
-| §10 `_build_graded_parallel_plate_mesh` | —                                 | widens `edge_band` to cover the fillet                                                                                                                                                                                                            |
-| §10 `example_parallel_plate`            | —                                 | prints edge treatment; plot titles note radius when > 0                                                                                                                                                                                           |
-| §9 `plot_solution`                      | `emag_vmin`, `emag_vmax`          | new optional params, default `None` (unchanged autoscale). **General plotting utility, not rounded-edges-specific** — added so two separate calls (e.g. sharp vs. rounded) can share one `\E\|` color scale; see *Known limitations* and *Usage*. |
-| §10 `_solve_parallel_plate`             | `emag_peak`                       | new dict key: free-space `\|E\|` peak, via the same node-projection `plot_solution` uses for its panel — always matches what's actually rendered.                                                                                                 |
-| §10 `compare_parallel_plate_runs`       | —                                 | new function, the general primitive: solves any two `ParallelPlateConfig` objects and plots both on a shared `\|E\|` scale, reporting which fields differ. **Not rounded-edges-specific** — see *Usage*.                                          |
+| Section | Symbol | Change |
+| --- | --- | --- |
+| §3 GEOMETRY | `RoundedRectangle(Shape)` | New class |
+| §2 CONFIGURATION | `ParallelPlateConfig.edge_radius` | New field, `float = 0.0`, plus `__post_init__` bound |
+| §10 `_build_parallel_plate_geometry` | — | Emits `RoundedRectangle` instead of `Rectangle` for both plates when radius > 0; re-clamps radius to snapped dimensions; adds `dims["edge_radius"]` |
+| §10 `_build_graded_parallel_plate_mesh` | — | Widens `edge_band` to cover the fillet |
+| §10 `example_parallel_plate` | — | Prints edge treatment; plot titles note radius when > 0 |
+| §9 `plot_solution` | `emag_vmin`, `emag_vmax` | New optional parameters, default `None` (unchanged autoscale). **General plotting utility, not rounded-edges-specific** — added so two separate calls (e.g. sharp vs. rounded) can share one ` E ` color scale; see *Known limitations* and *Usage*. |
+| §10 `_solve_parallel_plate` | `emag_peak` | New dict key: free-space ` E ` peak, via the same node-projection `plot_solution` uses for its panel — always matches what's actually rendered. |
+| §10 `compare_parallel_plate_runs` | — | New function, the general primitive: solves any two `ParallelPlateConfig` objects and plots both on a shared ` E ` scale, reporting which fields differ. **Not rounded-edges-specific** — see *Usage*. |
 
 **Untouched:** `Mesh`, `assemble_stiffness`, `apply_conductors_and_solve`,
 `compute_fields`, `plot_solution`, `example_coax`, `_solve_exact_check`,
