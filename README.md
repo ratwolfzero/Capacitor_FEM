@@ -44,7 +44,7 @@ its development history, known limitations, and future work.
   (`capacitor_fem_universal.py`). That script contains robustness
   improvements for Pydroid 3 but runs unchanged on desktop, Jupyter /
   Carnets (static plots), and Pydroid 3 — it is the universal version.
-  See §7.1.2.
+  See §7.1.1.
 
 ## Historical delta from the original version
 
