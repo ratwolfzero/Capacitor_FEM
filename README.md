@@ -40,8 +40,8 @@ its development history, known limitations, and future work.
   thickness/dielectric-vs-gap after `snap_to_grid` so an otherwise-valid
   config can't be pushed into an invalid one by grid rounding at a
   particular `h` without raising a specific, actionable error.
-- **Further development is carried out on the Android / Pydroid path**
-  (`capacitor_fem_PyDroid_comparison.py`). That script contains robustness
+- **Further development is carried out on**
+  (`capacitor_fem_universal.py`). That script contains robustness
   improvements for Pydroid 3 but runs unchanged on desktop, Jupyter /
   Carnets (static plots), and Pydroid 3 — it is the universal version.
   See §7.1.2.
@@ -124,8 +124,7 @@ its development history, known limitations, and future work.
   - [6. Installation](#6-installation)
   - [7. Usage](#7-usage)
     - [7.1 Running the Examples](#71-running-the-examples)
-    - [7.1.1 Jupyter](#711-jupyter)
-    - [7.1.2 Android / Pydroid (universal development path)](#712-android--pydroid-universal-development-path)
+    - [7.1.1 Universal development path](#711-universal-development-path)
     - [7.2 Quick Start](#72-quick-start)
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
   - [8. Validation and Verification](#8-validation-and-verification)
@@ -612,22 +611,17 @@ backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
 introduce close lag. If a window is put into full-screen with the
 green traffic-light button, exit with **Ctrl+F**.
 
-### 7.1.1 Jupyter
+### 7.1.1 Universal development path
 
-Jupyter / Carnets (iOS) note
-The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
-
-### 7.1.2 Android / Pydroid (universal development path)
-
-Further development is carried out on the Android / Pydroid path
-(`capacitor_fem_PyDroid_comparison.py` and the Android folder). That file
+Further development is carried out on
+(`capacitor_fem_universal.py`). That file
 contains robustness improvements for Pydroid 3 on Android, but the same
 script runs unchanged on desktop, Jupyter / Carnets (with static plots),
 and Pydroid 3 for Android — it is therefore the **universal** version of
 the solver. Prefer it for new work; the desktop-only `capacitor_fem.py`
 is retained for reference and bit-compatible core numerics.
 
-The Android-oriented script includes:
+The universal script includes:
 
 - Save-only plotting on Android / Pydroid (no blocking `plt.show()`),
   while still writing PNGs when `SAVE_FIGURES = True`.
@@ -637,7 +631,7 @@ The Android-oriented script includes:
   edges via `edge_radius`, shared-scale comparison helper) that remain
   fully usable on every supported platform.
 
-See the Android folder and `DELTA_rounded_edges.md` for details of the
+See  `DELTA_rounded_edges.md` for details of the
 latest changes.
 
 ### 7.2 Quick Start
