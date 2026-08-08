@@ -61,7 +61,7 @@ FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
 # --- I/O ----------------------------------------------------------------------
-OUTPUT_DIR: str = "Android"
+OUTPUT_DIR: str = ""
 """Directory for output figures.  Empty string → current working directory."""
 
 # --- Numerical tolerances -----------------------------------------------------
