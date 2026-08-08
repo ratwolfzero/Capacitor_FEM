@@ -1851,6 +1851,7 @@ if __name__ == "__main__":
     )
     print()
 
+    #standard examples
     C1, C1_ideal, pp_results, graded_result = example_parallel_plate()
     C2, C2_ideal, coax_results = example_coax()
 
