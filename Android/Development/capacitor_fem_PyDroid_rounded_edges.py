@@ -61,7 +61,7 @@ FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
 # --- I/O ----------------------------------------------------------------------
-OUTPUT_DIR: str = ""
+OUTPUT_DIR: str = "Android/Development"
 """Directory for output figures.  Empty string → current working directory."""
 
 # --- Numerical tolerances -----------------------------------------------------
@@ -1789,6 +1789,22 @@ def print_summary(C1, C1_ideal, C2, C2_ideal, elapsed):
 # 11. MAIN
 # =============================================================================
 
+# =============================================================================
+# 11a. Optional Comparison of sharp versus rounded edge and plot both 
+#     on one shared |E| color scale.
+# =============================================================================
+
+"""
+config = ParallelPlateConfig()
+
+r_sharp, r_rounded = compare_parallel_plate_edge_treatments(
+    config,
+    edge_radius=0.5e-3,       # radius for the rounded run (optional – defaults to max allowed)
+    h=0.1e-3,                 # mesh spacing (optional – defaults to config.mesh_spacing)
+    use_graded=True,          # True = graded mesh, False = uniform
+    fname_prefix="compare_edges"   # files will be compare_edges_sharp.png / _rounded.png
+)
+"""
 if __name__ == "__main__":
     t_start = time.time()
 
