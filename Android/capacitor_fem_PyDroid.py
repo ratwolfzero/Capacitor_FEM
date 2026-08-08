@@ -14,7 +14,7 @@ import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace, fields
 from typing import ClassVar
 
 import numpy as np
@@ -61,7 +61,7 @@ FORCE_SAVE_ONLY_ON_ANDROID: bool = True
 PLOT_WAIT_TIMEOUT_S: float = 10.0   # kept only for desktop fallback
 
 # --- I/O ----------------------------------------------------------------------
-OUTPUT_DIR: str = ""
+OUTPUT_DIR: str = "Android/Development"
 """Directory for output figures.  Empty string → current working directory."""
 
 # --- Numerical tolerances -----------------------------------------------------
@@ -224,12 +224,19 @@ class ParallelPlateConfig(_AutoSpacingConfig):
     bottom_plate_width / top_plate_width may differ (plates are centered in
     the domain).  Defaults keep both equal (classical symmetric capacitor);
     set top_plate_width smaller to study overhang / asymmetric fringing.
+
+    edge_radius optionally rounds all four corners of both plates to a
+    common fillet radius (0, the default, keeps the classic sharp
+    rectangular profile — see RoundedRectangle).  It is capped at half the
+    smallest of plate_thickness / bottom_plate_width / top_plate_width,
+    since a fillet can never exceed half of the shorter side it rounds.
     """
     plate_thickness: float = 1e-3
     gap: float = 4e-3
     dielectric_thickness: float = 2e-3
     bottom_plate_width: float = 24e-3
     top_plate_width: float = 24e-3
+    edge_radius: float = 0.0
     domain_margin: float = 15e-3
     voltage: float = 100.0
     dielectric_eps_r: float = 4.5
@@ -267,6 +274,25 @@ class ParallelPlateConfig(_AutoSpacingConfig):
                 f"gap ({self.gap * 1e3:.4g} mm): the dielectric slab sits "
                 f"inside the gap, so a thicker slab would overlap the top "
                 f"plate. Reduce dielectric_thickness or increase gap.")
+
+        if not np.isfinite(self.edge_radius) or self.edge_radius < 0.0:
+            raise ValueError(
+                "ParallelPlateConfig.edge_radius must be a finite, "
+                "non-negative length in meters (0 means sharp rectangular "
+                f"corners), got {self.edge_radius!r}.")
+
+        if self.edge_radius > 0.0:
+            max_edge_radius = 0.5 * min(self.plate_thickness,
+                                        self.bottom_plate_width,
+                                        self.top_plate_width)
+            if self.edge_radius > max_edge_radius:
+                raise ValueError(
+                    f"ParallelPlateConfig.edge_radius "
+                    f"({self.edge_radius * 1e3:.4g} mm) cannot exceed half "
+                    f"of the smallest plate dimension it rounds "
+                    f"({max_edge_radius * 1e3:.4g} mm, from plate_thickness "
+                    f"/ bottom_plate_width / top_plate_width). Reduce "
+                    f"edge_radius or enlarge the plate.")
 
         for name in ("dielectric_eps_r", "background_eps_r"):
             value = getattr(self, name)
@@ -391,6 +417,68 @@ class Rectangle(Shape):
         tol = BOUNDARY_TOLERANCE_M
         return ((x >= self.x0 - tol) & (x <= self.x0 + self.width + tol) &
                 (y >= self.y0 - tol) & (y <= self.y0 + self.height + tol))
+
+
+class RoundedRectangle(Shape):
+    """Axis-aligned rectangle [x0, x0+width] × [y0, y0+height] with all four
+    corners filleted to a common radius.
+
+    This is the standard way to soften an idealized conductor edge: a
+    perfectly sharp 90-degree corner carries a field singularity that real
+    machined or stamped electrodes never actually have.  Rounding the
+    corners removes that artifact and gives a more physically realistic
+    field near the plate edge.  radius=0 reproduces a plain Rectangle
+    exactly (and is handled as a fast-path special case below).
+    """
+
+    def __init__(self, x0, y0, width, height, radius,
+                 voltage=None, eps_r=None, name="rounded_rectangle"):
+        if not np.isfinite(width) or width <= 0.0:
+            raise ValueError(
+                f"RoundedRectangle '{name}': width must be positive and finite, got {width!r}")
+        if not np.isfinite(height) or height <= 0.0:
+            raise ValueError(
+                f"RoundedRectangle '{name}': height must be positive and finite, got {height!r}")
+        if not np.isfinite(radius) or radius < 0.0:
+            raise ValueError(
+                f"RoundedRectangle '{name}': radius must be non-negative and finite, got {radius!r}")
+        max_radius = 0.5 * min(width, height)
+        if radius > max_radius + BOUNDARY_TOLERANCE_M:
+            raise ValueError(
+                f"RoundedRectangle '{name}': radius ({radius:.6g}) cannot exceed "
+                f"half of the shorter side ({max_radius:.6g}); the four fillets "
+                f"would overlap. Reduce radius or enlarge width/height.")
+        self.x0, self.y0 = x0, y0
+        self.width, self.height = width, height
+        self.radius = min(radius, max_radius)  # clamp away float overshoot at equality
+        self.voltage = voltage
+        self.eps_r = eps_r
+        self.name = name
+
+    def contains(self, x, y):
+        tol = BOUNDARY_TOLERANCE_M
+        r = self.radius
+        if r <= 0.0:
+            return ((x >= self.x0 - tol) & (x <= self.x0 + self.width + tol) &
+                    (y >= self.y0 - tol) & (y <= self.y0 + self.height + tol))
+
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        cx = self.x0 + 0.5 * self.width
+        cy = self.y0 + 0.5 * self.height
+        ex = 0.5 * self.width - r    # half-extent of the "inner" rectangle
+        ey = 0.5 * self.height - r   # traced out by the fillet centers
+
+        qx = np.abs(x - cx) - ex
+        qy = np.abs(y - cy) - ey
+
+        # Signed distance to a rounded box (<=0 inside/on boundary, >0
+        # outside): straight sides behave like an ordinary rectangle, and
+        # near a corner it falls back to "distance to the fillet center,
+        # minus r", exactly the disk that rounds that corner.
+        outside_dist = (np.hypot(np.maximum(qx, 0.0), np.maximum(qy, 0.0))
+                        + np.minimum(np.maximum(qx, qy), 0.0) - r)
+        return outside_dist <= tol
 
 
 class Circle(Shape):
@@ -855,9 +943,16 @@ def _show_blocking_figure(fig, message=None):
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
                   title, fname, xlim=None, ylim=None, style=None,
-                  Ex=None, Ey=None):
+                  Ex=None, Ey=None, emag_vmin=None, emag_vmax=None):
     """Four-panel summary: dielectric map, equipotentials, field magnitude
-    with streamlines, and energy density (log scale)."""
+    with streamlines, and energy density (log scale).
+
+    emag_vmin / emag_vmax: fix the |E| panel's color scale instead of
+    autoscaling to this call's own min/max. Both default to None (current
+    behavior, unchanged). Use this to make two separate plot_solution()
+    calls (e.g. a sharp-edge and a rounded-edge run) share one color scale
+    so they're visually comparable -- see DELTA_rounded_edges.md, "Known
+    limitations", for why that matters."""
     style = style or PlotConfig()
     xs, ys, nx, ny = mesh.xs, mesh.ys, mesh.nx, mesh.ny
     X, Y = np.meshgrid(xs, ys)
@@ -919,7 +1014,8 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
 
     # Panel 3: field magnitude + streamlines
     ax = axes[1, 0]
-    pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
+    pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno,
+                        vmin=emag_vmin, vmax=emag_vmax)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
 
     ExG_plot = np.where(cond_grid, 0.0, ExG)
@@ -1162,10 +1258,23 @@ def _build_parallel_plate_geometry(config, h):
     y_gap_lo = margin + plate_t
     y_gap_hi = y_gap_lo + gap
 
-    bottom_plate = Rectangle(x_bottom0, margin, bottom_w, plate_t,
-                             voltage=0.0, name="bottom_plate")
-    top_plate = Rectangle(x_top0, y_gap_hi, top_w, plate_t,
-                          voltage=config.voltage, name="top_plate")
+    # edge_radius is validated against the *nominal* plate dimensions in
+    # ParallelPlateConfig.__post_init__, but snap_to_grid() can shrink the
+    # actual plate_t/bottom_w/top_w slightly at coarse h; clamp again here
+    # so a coarse step of a convergence sweep can never make the fillets
+    # on a single plate overlap each other.
+    edge_radius = min(config.edge_radius, 0.5 * plate_t, 0.5 * bottom_w, 0.5 * top_w)
+
+    if edge_radius > 0.0:
+        bottom_plate = RoundedRectangle(x_bottom0, margin, bottom_w, plate_t, edge_radius,
+                                        voltage=0.0, name="bottom_plate")
+        top_plate = RoundedRectangle(x_top0, y_gap_hi, top_w, plate_t, edge_radius,
+                                     voltage=config.voltage, name="top_plate")
+    else:
+        bottom_plate = Rectangle(x_bottom0, margin, bottom_w, plate_t,
+                                 voltage=0.0, name="bottom_plate")
+        top_plate = Rectangle(x_top0, y_gap_hi, top_w, plate_t,
+                              voltage=config.voltage, name="top_plate")
     conductors = [bottom_plate, top_plate]
 
     dielectrics = []
@@ -1183,6 +1292,7 @@ def _build_parallel_plate_geometry(config, h):
         "x_bottom0": x_bottom0, "x_top0": x_top0,
         "y_gap_lo": y_gap_lo, "y_gap_hi": y_gap_hi,
         "plate_w": plate_w_max, "x_plate0": margin,
+        "edge_radius": edge_radius,
     }
     return conductors, eps_r_of_xy, dims
 
@@ -1196,6 +1306,13 @@ def _build_graded_parallel_plate_mesh(h, dims, tune=None):
     x_plate0 = d["x_plate0"]
 
     edge_band = max(tune.edge_band_width_factor * h, tune.edge_band_width_min_m)
+
+    # Widen the refined band so it fully covers a rounded plate edge too --
+    # otherwise the fillet's curvature would sit partly in the coarser
+    # interior spacing and be poorly resolved on a structured grid.
+    if d["edge_radius"] > 0.0:
+        edge_band = max(edge_band, d["edge_radius"] + tune.edge_band_width_factor * h)
+
     n_margin_x = max(tune.min_margin_points,
                      round(d["margin"] / (tune.margin_spacing_factor * h)) + 1)
     n_edge = max(tune.min_edge_points,
@@ -1267,6 +1384,21 @@ def _solve_parallel_plate(config, h, use_graded=False):
     V, is_fixed, solve_time = apply_conductors_and_solve(mesh, K, conductors)
     Ex, Ey, Emag, Dx, Dy, energy_density, W = compute_fields(
         mesh, V, eps_elem, b, c, area, area2)
+
+    # Free-space |E| peak, computed with the exact same node-projection
+    # plot_solution's panel uses (component-wise projection, then
+    # magnitude -- not the same as projecting Emag directly) so this value
+    # always matches what that panel would render, and can be reused as a
+    # shared emag_vmax across separate plot_solution() calls without the
+    # caller re-deriving the field themselves.
+    Ex_nodes = _project_element_field_to_nodes(mesh, Ex)
+    Ey_nodes = _project_element_field_to_nodes(mesh, Ey)
+    Emag_nodes = np.hypot(Ex_nodes, Ey_nodes)
+    node_in_conductor = np.zeros(mesh.n_nodes, dtype=bool)
+    for cond in conductors:
+        node_in_conductor |= cond.contains(mesh.points[:, 0], mesh.points[:, 1])
+    emag_peak = float(Emag_nodes[~node_in_conductor].max())
+
     C = capacitance_from_energy(W, config.voltage, 0.0)
     overlap_w = min(d["bottom_w"], d["top_w"])
     C_ideal = (overlap_w * EPS0 /
@@ -1275,7 +1407,8 @@ def _solve_parallel_plate(config, h, use_graded=False):
 
     result = dict(h=h, mesh=mesh, conductors=conductors, eps_r_of_xy=eps_r_of_xy,
                   V=V, is_fixed=is_fixed, energy_density=energy_density,
-                  Ex=Ex, Ey=Ey, C=C, C_ideal=C_ideal, solve_time=solve_time, graded=use_graded)
+                  Ex=Ex, Ey=Ey, emag_peak=emag_peak, C=C, C_ideal=C_ideal,
+                  solve_time=solve_time, graded=use_graded)
     result.update(d)
     return result
 
@@ -1312,6 +1445,10 @@ def example_parallel_plate(config=None):
     print(f"  bottom plate (0 V): {config.bottom_plate_width*1e3:.1f} mm wide")
     print(f"  top plate ({config.voltage:g} V): {config.top_plate_width*1e3:.1f} mm wide"
           f"{'  (shorter → asymmetric fringing)' if config.top_plate_width != config.bottom_plate_width else ''}")
+    if config.edge_radius > 0.0:
+        print(f"  plate edges: rounded, fillet radius {config.edge_radius*1e3:.3f} mm")
+    else:
+        print("  plate edges: sharp (rectangular)")
     print()
 
     print("Mesh convergence (physical geometry fixed, only h changes):")
@@ -1333,6 +1470,9 @@ def example_parallel_plate(config=None):
           f"(FEM > ideal is expected: it also captures fringing)")
     print()
 
+    edge_note = (f", rounded edges r={config.edge_radius*1e3:.2f} mm"
+                 if config.edge_radius > 0.0 else "")
+
     if RUN_GRADED_COMPARISON:
         print("Graded Cartesian mesh (same nominal h, refined near edges & gap):")
         graded = _solve_parallel_plate(config, uniform["h"], use_graded=True)
@@ -1346,7 +1486,7 @@ def example_parallel_plate(config=None):
 
         plot_solution(graded["mesh"], graded["V"], graded["eps_r_of_xy"],
                       graded["energy_density"], graded["conductors"], graded["is_fixed"],
-                      "Parallel-plate capacitor (glass slab in an air gap) — graded mesh",
+                      f"Parallel-plate capacitor (glass slab in an air gap){edge_note} — graded mesh",
                       os.path.join(OUTPUT_DIR, "example1_parallel_plate.png"),
                       Ex=graded["Ex"], Ey=graded["Ey"],
                       xlim=(graded["x_plate0"] - config.plot_margin,
@@ -1358,7 +1498,7 @@ def example_parallel_plate(config=None):
 
     plot_solution(uniform["mesh"], uniform["V"], uniform["eps_r_of_xy"],
                   uniform["energy_density"], uniform["conductors"], uniform["is_fixed"],
-                  "Parallel-plate capacitor (glass slab in an air gap)",
+                  f"Parallel-plate capacitor (glass slab in an air gap){edge_note}",
                   os.path.join(OUTPUT_DIR, "example1_parallel_plate.png"),
                   Ex=uniform["Ex"], Ey=uniform["Ey"],
                   xlim=(uniform["x_plate0"] - config.plot_margin,
@@ -1367,6 +1507,121 @@ def example_parallel_plate(config=None):
                         uniform["margin"] + config.plot_margin
                         + 2 * uniform["plate_t"] + uniform["gap"]))
     return C_uniform, C_ideal, results, None
+
+
+def compare_parallel_plate_runs(config_a, config_b, label_a=None, label_b=None,
+                                h=None, use_graded=True, fname_prefix="compare"):
+    """Solve TWO arbitrary ParallelPlateConfig objects and plot both on one
+    shared |E| color scale, so they're honestly comparable regardless of
+    what differs between them -- radius, voltage, gap, dielectric, plate
+    width, anything. This is the general primitive; without a shared scale,
+    each plot_solution() call autoscales to its own peak, so the same
+    interior field can render a different color purely because the OTHER
+    run's peak moved (see DELTA_rounded_edges.md, "Known limitations").
+
+    HOW TO USE (step by step):
+      1. Build a base config the way you normally would.
+      2. Make a second config that differs in whatever you want to compare
+         -- the easiest way is `dataclasses.replace(base, some_field=...)`,
+         which copies every other field unchanged. (`replace` is imported
+         at the top of this file, so just `replace(base, voltage=200.0)`.)
+      3. Call compare_parallel_plate_runs(config_a, config_b). That's it --
+         it solves both, prints C and the |E| peak for each, tells you
+         which fields actually differ, and saves two PNGs on one shared
+         color scale.
+
+    Examples::
+
+        # (a) compare two voltages
+        base = ParallelPlateConfig()
+        lo = replace(base, voltage=50.0)
+        hi = replace(base, voltage=200.0)
+        compare_parallel_plate_runs(lo, hi, label_a="50V", label_b="200V")
+
+        # (b) compare two gaps
+        g1 = replace(base, gap=3e-3)
+        g2 = replace(base, gap=6e-3)
+        compare_parallel_plate_runs(g1, g2, label_a="gap=3mm", label_b="gap=6mm")
+
+        # (c) compare two fully independent configs (not just one field)
+        asym = ParallelPlateConfig(top_plate_width=12e-3, voltage=250.0)
+        compare_parallel_plate_runs(base, asym, label_a="baseline", label_b="asymmetric")
+
+        # (d) sharp vs. rounded plate edges. Tip: the largest radius a
+        #     given plate allows is 0.5 * min(plate_thickness,
+        #     bottom_plate_width, top_plate_width) -- exceeding it makes
+        #     the four fillets on one plate overlap (see RoundedRectangle).
+        sharp   = replace(base, edge_radius=0.0)
+        rounded = replace(base, edge_radius=0.4e-3)
+        compare_parallel_plate_runs(sharp, rounded, label_a="sharp", label_b="rounded")
+
+    config_a, config_b: any two ParallelPlateConfig instances. They do not
+    need to share mesh_spacing or geometry -- h (below) sets the actual
+    solve resolution for BOTH runs, and each plot is framed from its own
+    geometry, so even a plate-width or margin comparison works correctly.
+
+    label_a, label_b: short names for prints/titles/filenames. Default to
+    "A"/"B".
+
+    h: mesh spacing used for BOTH solves. Defaults to config_a.mesh_spacing.
+
+    use_graded: use the graded mesh (default) or uniform mesh for both.
+
+    fname_prefix: output files are saved as f"{fname_prefix}_{label}.png".
+
+    Returns (result_a, result_b), each the dict _solve_parallel_plate()
+    returns (including "emag_peak").
+    """
+    label_a = label_a or "A"
+    label_b = label_b or "B"
+    h = config_a.mesh_spacing if h is None else h
+
+    r_a = _solve_parallel_plate(config_a, h, use_graded=use_graded)
+    r_b = _solve_parallel_plate(config_b, h, use_graded=use_graded)
+
+    shared_vmax = max(r_a["emag_peak"], r_b["emag_peak"])
+    mesh_label = "graded mesh" if use_graded else "uniform mesh"
+
+    # Report exactly which config fields differ, so the summary is
+    # informative no matter what the caller changed.
+    diffs = [(f.name, getattr(config_a, f.name), getattr(config_b, f.name))
+             for f in fields(config_a)
+             if getattr(config_a, f.name) != getattr(config_b, f.name)]
+
+    print("=" * 72)
+    print(f"Comparing two parallel-plate runs: {label_a!r} vs {label_b!r}")
+    print("=" * 72)
+    if diffs:
+        print("  differing parameters:")
+        for name, va, vb in diffs:
+            print(f"    {name}: {va!r}  ->  {vb!r}")
+    else:
+        print("  WARNING: config_a and config_b are identical -- both runs "
+             "will produce the same solve.")
+    print(f"  h = {h * 1e3:.3f} mm, {mesh_label}")
+    print(f"  C:        {label_a} = {r_a['C'] * 1e12:9.4f} pF/m   "
+         f"{label_b} = {r_b['C'] * 1e12:9.4f} pF/m")
+    print(f"  |E| peak: {label_a} = {r_a['emag_peak']:9.1f} V/m    "
+         f"{label_b} = {r_b['emag_peak']:9.1f} V/m")
+    print(f"  shared color scale: 0 to {shared_vmax:.1f} V/m")
+
+    for label, config, r in ((label_a, config_a, r_a), (label_b, config_b, r_b)):
+        # each run is framed from its OWN geometry -- correct even when the
+        # varied parameter changes the bounding box (plate width, margin, ...)
+        xlim = (r["x_plate0"] - config.plot_margin,
+               r["x_plate0"] + r["plate_w"] + config.plot_margin)
+        ylim = (r["margin"] - config.plot_margin,
+               r["margin"] + config.plot_margin + 2 * r["plate_t"] + r["gap"])
+        safe_label = str(label).replace(" ", "_").replace("/", "-")
+        fname = os.path.join(OUTPUT_DIR, f"{fname_prefix}_{safe_label}.png")
+        plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
+                     r["conductors"], r["is_fixed"],
+                     f"Parallel-plate capacitor: {label} — {mesh_label}",
+                     fname, Ex=r["Ex"], Ey=r["Ey"], xlim=xlim, ylim=ylim,
+                     emag_vmin=0.0, emag_vmax=shared_vmax)
+        print(f"  saved: {fname}")
+
+    return r_a, r_b
 
 
 def _solve_coax(config, h):
@@ -1585,6 +1840,18 @@ if __name__ == "__main__":
         example_exact_check()
         print()
 
+    # --- quick comparison (shared |E| scale) ---
+    base = ParallelPlateConfig()
+    sharp   = replace(base, edge_radius=0.0)
+    rounded = replace(base, edge_radius=0.5e-3)
+    compare_parallel_plate_runs(
+        sharp, rounded,
+        label_a="sharp", label_b="r=0.5mm",
+        fname_prefix="compare_edges"
+    )
+    print()
+
+    #standard examples
     C1, C1_ideal, pp_results, graded_result = example_parallel_plate()
     C2, C2_ideal, coax_results = example_coax()
 
