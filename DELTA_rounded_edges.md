@@ -223,7 +223,7 @@ general call — no dedicated function for it:
 
 ```python
 r_sharp, r_rounded = compare_parallel_plate_runs(
-    replace(config, edge_radius=0.0), replace(config, edge_radius=0.4e-3),
+    replace(config, edge_radius=0.0), replace(config, edge_radius=0.6e-3),
     label_a="sharp", label_b="rounded")
 ```
 
