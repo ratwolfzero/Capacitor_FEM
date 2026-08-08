@@ -14,7 +14,8 @@ identical to the pre-delta file — see *Verification*.
 | §10 `example_parallel_plate`                 | —                                 | prints edge treatment; plot titles note radius when > 0                                                                                                                                                                                              |
 | §9 `plot_solution`                           | `emag_vmin`, `emag_vmax`          | new optional params, default `None` (unchanged autoscale). **General plotting utility, not rounded-edges-specific** — added so two separate calls (e.g. sharp vs. rounded) can share one ` \|E\| ` color scale; see *Known limitations* and *Usage*. |
 | §10 `_solve_parallel_plate`                  | `emag_peak`                       | new dict key: free-space `\|E\|` peak, via the same node-projection `plot_solution` uses for its panel — always matches what's actually rendered.                                                                                                    |
-| §10 `compare_parallel_plate_edge_treatments` | —                                 | new function: one call solves sharp vs. rounded (everything else identical) and plots both on a shared `\|E\|` scale — see *Usage*.                                                                                                                  |
+| §10 `compare_parallel_plate_runs`            | —                                 | new function, the general primitive: solves any two `ParallelPlateConfig` objects and plots both on a shared `\|E\|` scale, reporting which fields differ. **Not rounded-edges-specific** — see *Usage*.                                             |
+| §10 `compare_parallel_plate_edge_treatments` | —                                 | refactored into a thin wrapper around `compare_parallel_plate_runs()` for the one specific sharp-vs-rounded case; same signature/behavior as before the refactor.                                                                                    |
 
 **Untouched:** `Mesh`, `assemble_stiffness`, `apply_conductors_and_solve`,
 `compute_fields`, `plot_solution`, `example_coax`, `_solve_exact_check`,
@@ -57,7 +58,7 @@ One radius, shared by both plates (mirrors `plate_thickness`, also shared).
 coarse `h` below what the nominal check above saw. `_build_parallel_plate_geometry`
 therefore recomputes, per `h`, without raising:
 
-```text
+```txt
 edge_radius_used = min(config.edge_radius, 0.5·plate_t, 0.5·bottom_w, 0.5·top_w)
 ```
 
@@ -71,7 +72,7 @@ convergence sweep.
 `edge_band` (fine-spacing zone at each plate end) widens when rounding is
 active:
 
-```text
+```txt
 edge_band = max(edge_band, edge_radius + edge_band_width_factor · h)
 ```
 
@@ -169,6 +170,20 @@ or rounded — as order-of-magnitude only.
    output (adding a dict key doesn't touch anything `plot_solution`
    consumes); ran end-to-end and confirmed both saved plots share one
    colorbar range.
+9. **`compare_parallel_plate_runs`** (general primitive, after the
+   refactor): voltage comparison (50V vs 200V, else default) — `C` came out
+   identical to 5 significant figures between the two runs (physically
+   required; capacitance doesn't depend on voltage) and peak `\|E\|` scaled
+   by `4.0001×` for an exact `4×` voltage ratio (linear electrostatics);
+   plate-width comparison (8mm vs 16mm) — correctly flagged both
+   `bottom_plate_width` and `top_plate_width` as differing, and each plot
+   was framed from its *own* bounding box rather than a shared one, since
+   the geometries genuinely differ; identical-config case correctly emits
+   a warning instead of silently plotting two copies of the same solve;
+   confirmed `compare_parallel_plate_edge_treatments` (now a thin wrapper
+   around this function) reproduces byte-identical printed numbers to its
+   pre-refactor version (`C`: 53.9927 / 52.8295 pF/m, `\|E\|` peak: 53872.5
+   / 55683.8 V/m, sharp/rounded).
 
 ## Usage
 
@@ -177,20 +192,49 @@ config = ParallelPlateConfig(edge_radius=0.4e-3)  # 0.4 mm fillet, both plates
 C, C_ideal, results, graded = example_parallel_plate(config)
 ```
 
-**Comparable-scale sharp vs. rounded plots** (see *Known limitations*) —
-one call, everything else about `config` held identical between the two runs:
+**Comparing two runs on a shared `|E|` scale — general case, step by step**
+(see *Known limitations* for why independent autoscaling is misleading):
+
+1. Build a base config the normal way.
+2. Build a second config that differs in whatever you want to compare.
+   `replace(base, field=value)` copies every other field unchanged
+   (`replace` is imported at the top of the file, alongside `dataclass`).
+3. Call `compare_parallel_plate_runs(config_a, config_b)`. It solves both,
+   prints `C` and the `|E|` peak for each, lists which fields actually
+   differ, and saves two PNGs sharing one color scale.
 
 ```python
-r_sharp, r_rounded = compare_parallel_plate_edge_treatments(config)
+base = ParallelPlateConfig()
 
-# or with an explicit radius / mesh spacing / uniform mesh:
-r_sharp, r_rounded = compare_parallel_plate_edge_treatments(
-    config, edge_radius=0.4e-3, h=0.1e-3, use_graded=False)
+# vary one field...
+lo = replace(base, voltage=50.0)
+hi = replace(base, voltage=200.0)
+compare_parallel_plate_runs(lo, hi, label_a="50V", label_b="200V")
+
+# ...vary several at once, or hand it two fully independent configs
+asym = ParallelPlateConfig(top_plate_width=12e-3, voltage=250.0)
+compare_parallel_plate_runs(base, asym, label_a="baseline", label_b="asymmetric")
 ```
 
-Prints both `C` and `emag_peak`, saves `compare_edges_sharp.png` and
-`compare_edges_rounded.png` (or `fname_prefix=...`) to `OUTPUT_DIR`, and
-returns both result dicts for further use. Drop to
-`plot_solution(..., emag_vmin=, emag_vmax=)` directly only if you need a
-comparison this function doesn't cover (e.g. two configs that differ in
-more than `edge_radius`).
+Not limited to same-geometry comparisons either — a plate-width comparison
+(different `bottom_plate_width`/`top_plate_width` on each side) works too;
+each plot is framed from its own bounding box rather than a shared one,
+since the geometries genuinely differ (Verification #9).
+
+Sanity check this gives you for free: comparing `50V` vs `200V` (else
+identical) reproduces `C` to 5 significant figures on both runs — correct,
+since capacitance doesn't depend on voltage — and scales peak `|E|` by
+almost exactly `4×`, matching the voltage ratio, as linear electrostatics
+requires.
+
+**Sharp vs. rounded specifically** — `compare_parallel_plate_edge_treatments`
+is a thin wrapper around the same function for exactly this one comparison:
+
+```python
+r_sharp, r_rounded = compare_parallel_plate_edge_treatments(config, edge_radius=0.4e-3)
+
+# equivalent, spelled out with the general function directly:
+r_sharp, r_rounded = compare_parallel_plate_runs(
+    replace(config, edge_radius=0.0), replace(config, edge_radius=0.4e-3),
+    label_a="sharp", label_b="rounded")
+```

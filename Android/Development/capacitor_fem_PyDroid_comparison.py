@@ -14,7 +14,7 @@ import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, fields
 from typing import ClassVar
 
 import numpy as np
@@ -1509,78 +1509,145 @@ def example_parallel_plate(config=None):
     return C_uniform, C_ideal, results, None
 
 
+def compare_parallel_plate_runs(config_a, config_b, label_a=None, label_b=None,
+                                h=None, use_graded=True, fname_prefix="compare"):
+    """Solve TWO arbitrary ParallelPlateConfig objects and plot both on one
+    shared |E| color scale, so they're honestly comparable regardless of
+    what differs between them -- radius, voltage, gap, dielectric, plate
+    width, anything. This is the general primitive; without a shared scale,
+    each plot_solution() call autoscales to its own peak, so the same
+    interior field can render a different color purely because the OTHER
+    run's peak moved (see DELTA_rounded_edges.md, "Known limitations").
+
+    HOW TO USE (step by step):
+      1. Build a base config the way you normally would.
+      2. Make a second config that differs in whatever you want to compare
+         -- the easiest way is `dataclasses.replace(base, some_field=...)`,
+         which copies every other field unchanged. (`replace` is imported
+         at the top of this file, so just `replace(base, voltage=200.0)`.)
+      3. Call compare_parallel_plate_runs(config_a, config_b). That's it --
+         it solves both, prints C and the |E| peak for each, tells you
+         which fields actually differ, and saves two PNGs on one shared
+         color scale.
+
+    Examples::
+
+        # (a) compare two voltages
+        base = ParallelPlateConfig()
+        lo = replace(base, voltage=50.0)
+        hi = replace(base, voltage=200.0)
+        compare_parallel_plate_runs(lo, hi, label_a="50V", label_b="200V")
+
+        # (b) compare two gaps
+        g1 = replace(base, gap=3e-3)
+        g2 = replace(base, gap=6e-3)
+        compare_parallel_plate_runs(g1, g2, label_a="gap=3mm", label_b="gap=6mm")
+
+        # (c) compare two fully independent configs (not just one field)
+        asym = ParallelPlateConfig(top_plate_width=12e-3, voltage=250.0)
+        compare_parallel_plate_runs(base, asym, label_a="baseline", label_b="asymmetric")
+
+        # (d) sharp vs. rounded -- exactly what
+        #     compare_parallel_plate_edge_treatments() does internally
+        sharp   = replace(base, edge_radius=0.0)
+        rounded = replace(base, edge_radius=0.4e-3)
+        compare_parallel_plate_runs(sharp, rounded, label_a="sharp", label_b="rounded")
+
+    config_a, config_b: any two ParallelPlateConfig instances. They do not
+    need to share mesh_spacing or geometry -- h (below) sets the actual
+    solve resolution for BOTH runs, and each plot is framed from its own
+    geometry, so even a plate-width or margin comparison works correctly.
+
+    label_a, label_b: short names for prints/titles/filenames. Default to
+    "A"/"B".
+
+    h: mesh spacing used for BOTH solves. Defaults to config_a.mesh_spacing.
+
+    use_graded: use the graded mesh (default) or uniform mesh for both.
+
+    fname_prefix: output files are saved as f"{fname_prefix}_{label}.png".
+
+    Returns (result_a, result_b), each the dict _solve_parallel_plate()
+    returns (including "emag_peak").
+    """
+    label_a = label_a or "A"
+    label_b = label_b or "B"
+    h = config_a.mesh_spacing if h is None else h
+
+    r_a = _solve_parallel_plate(config_a, h, use_graded=use_graded)
+    r_b = _solve_parallel_plate(config_b, h, use_graded=use_graded)
+
+    shared_vmax = max(r_a["emag_peak"], r_b["emag_peak"])
+    mesh_label = "graded mesh" if use_graded else "uniform mesh"
+
+    # Report exactly which config fields differ, so the summary is
+    # informative no matter what the caller changed.
+    diffs = [(f.name, getattr(config_a, f.name), getattr(config_b, f.name))
+             for f in fields(config_a)
+             if getattr(config_a, f.name) != getattr(config_b, f.name)]
+
+    print("=" * 72)
+    print(f"Comparing two parallel-plate runs: {label_a!r} vs {label_b!r}")
+    print("=" * 72)
+    if diffs:
+        print("  differing parameters:")
+        for name, va, vb in diffs:
+            print(f"    {name}: {va!r}  ->  {vb!r}")
+    else:
+        print("  WARNING: config_a and config_b are identical -- both runs "
+             "will produce the same solve.")
+    print(f"  h = {h * 1e3:.3f} mm, {mesh_label}")
+    print(f"  C:        {label_a} = {r_a['C'] * 1e12:9.4f} pF/m   "
+         f"{label_b} = {r_b['C'] * 1e12:9.4f} pF/m")
+    print(f"  |E| peak: {label_a} = {r_a['emag_peak']:9.1f} V/m    "
+         f"{label_b} = {r_b['emag_peak']:9.1f} V/m")
+    print(f"  shared color scale: 0 to {shared_vmax:.1f} V/m")
+
+    for label, config, r in ((label_a, config_a, r_a), (label_b, config_b, r_b)):
+        # each run is framed from its OWN geometry -- correct even when the
+        # varied parameter changes the bounding box (plate width, margin, ...)
+        xlim = (r["x_plate0"] - config.plot_margin,
+               r["x_plate0"] + r["plate_w"] + config.plot_margin)
+        ylim = (r["margin"] - config.plot_margin,
+               r["margin"] + config.plot_margin + 2 * r["plate_t"] + r["gap"])
+        safe_label = str(label).replace(" ", "_").replace("/", "-")
+        fname = os.path.join(OUTPUT_DIR, f"{fname_prefix}_{safe_label}.png")
+        plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
+                     r["conductors"], r["is_fixed"],
+                     f"Parallel-plate capacitor: {label} — {mesh_label}",
+                     fname, Ex=r["Ex"], Ey=r["Ey"], xlim=xlim, ylim=ylim,
+                     emag_vmin=0.0, emag_vmax=shared_vmax)
+        print(f"  saved: {fname}")
+
+    return r_a, r_b
+
+
 def compare_parallel_plate_edge_treatments(config, edge_radius=None, h=None,
                                            use_graded=True,
                                            fname_prefix="compare_edges"):
-    """Solve `config` twice -- sharp plate edges (edge_radius=0) and rounded
-    (edge_radius=`edge_radius`) -- holding every other parameter fixed, and
-    plot both on one shared |E| color scale.
-
-    Without this, each plot_solution() call autoscales its own |E| panel to
-    its own peak, so the same interior field can render a different color
-    purely because the OTHER run's peak moved (see DELTA_rounded_edges.md,
-    "Known limitations", for why). This does the comparison in one call:
-    solve both, take the shared max of result["emag_peak"], pass it as
-    emag_vmax to both plot_solution() calls.
+    """Convenience wrapper around compare_parallel_plate_runs() for the one
+    specific case of sharp vs. rounded edges. For any OTHER parameter (or
+    several at once), call compare_parallel_plate_runs() directly -- see
+    its docstring for the general pattern and worked examples.
 
     edge_radius defaults to the largest radius this geometry allows,
-    0.5 * min(plate_thickness, bottom_plate_width, top_plate_width). h
-    defaults to config.mesh_spacing. Any edge_radius already set on `config`
-    is ignored -- this function sets it explicitly on each copy so the two
-    runs differ in exactly that one parameter (via dataclasses.replace,
-    every other field -- thickness, gap, widths, voltage, dielectric,
-    mesh_spacing, ... -- stays identical between them).
+    0.5 * min(plate_thickness, bottom_plate_width, top_plate_width). Any
+    edge_radius already set on `config` is ignored -- this builds two
+    copies via dataclasses.replace() so the two runs differ in exactly
+    that one field.
 
-    Returns (result_sharp, result_rounded), each the dict
-    _solve_parallel_plate() returns (now including "emag_peak").
+    Returns (result_sharp, result_rounded).
     """
     if edge_radius is None:
         edge_radius = 0.5 * min(config.plate_thickness,
                                 config.bottom_plate_width,
                                 config.top_plate_width)
-    h = config.mesh_spacing if h is None else h
-
     cfg_sharp = replace(config, edge_radius=0.0)
     cfg_rounded = replace(config, edge_radius=edge_radius)
-
-    r_sharp = _solve_parallel_plate(cfg_sharp, h, use_graded=use_graded)
-    r_rounded = _solve_parallel_plate(cfg_rounded, h, use_graded=use_graded)
-
-    shared_vmax = max(r_sharp["emag_peak"], r_rounded["emag_peak"])
-    mesh_label = "graded mesh" if use_graded else "uniform mesh"
-
-    # bounding box is identical for both (rounding only cuts into corners,
-    # never changes plate_w / margin / plate_t / gap), so either result's
-    # dims give the same frame for both plots
-    xlim = (r_sharp["x_plate0"] - config.plot_margin,
-           r_sharp["x_plate0"] + r_sharp["plate_w"] + config.plot_margin)
-    ylim = (r_sharp["margin"] - config.plot_margin,
-           r_sharp["margin"] + config.plot_margin
-           + 2 * r_sharp["plate_t"] + r_sharp["gap"])
-
-    print("=" * 72)
-    print("Sharp vs. rounded plate edges, shared |E| color scale")
-    print("=" * 72)
-    print(f"  edge_radius: 0 mm (sharp)  vs  {edge_radius * 1e3:.3f} mm (rounded)")
-    print(f"  h = {h * 1e3:.3f} mm, {mesh_label}")
-    print(f"  C:        sharp = {r_sharp['C'] * 1e12:9.4f} pF/m   "
-         f"rounded = {r_rounded['C'] * 1e12:9.4f} pF/m")
-    print(f"  |E| peak: sharp = {r_sharp['emag_peak']:9.1f} V/m    "
-         f"rounded = {r_rounded['emag_peak']:9.1f} V/m")
-    print(f"  shared color scale: 0 to {shared_vmax:.1f} V/m")
-
-    for label, r in (("sharp", r_sharp), ("rounded", r_rounded)):
-        radius_mm = 0.0 if label == "sharp" else edge_radius * 1e3
-        edge_desc = "sharp" if radius_mm == 0.0 else f"r={radius_mm:.3f} mm"
-        fname = os.path.join(OUTPUT_DIR, f"{fname_prefix}_{label}.png")
-        plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
-                     r["conductors"], r["is_fixed"],
-                     f"Parallel-plate capacitor, {edge_desc} edges — {mesh_label}",
-                     fname, Ex=r["Ex"], Ey=r["Ey"], xlim=xlim, ylim=ylim,
-                     emag_vmin=0.0, emag_vmax=shared_vmax)
-        print(f"  saved: {fname}")
-
-    return r_sharp, r_rounded
+    return compare_parallel_plate_runs(
+        cfg_sharp, cfg_rounded,
+        label_a="sharp", label_b=f"r={edge_radius * 1e3:.3f}mm",
+        h=h, use_graded=use_graded, fname_prefix=fname_prefix)
 
 
 def _solve_coax(config, h):
@@ -1789,22 +1856,6 @@ def print_summary(C1, C1_ideal, C2, C2_ideal, elapsed):
 # 11. MAIN
 # =============================================================================
 
-# =============================================================================
-# 11a. Optional Comparison of sharp versus rounded edge and plot both 
-#     on one shared |E| color scale.
-# =============================================================================
-
-"""
-config = ParallelPlateConfig()
-
-r_sharp, r_rounded = compare_parallel_plate_edge_treatments(
-    config,
-    edge_radius=0.5e-3,       # radius for the rounded run (optional – defaults to max allowed)
-    h=0.1e-3,                 # mesh spacing (optional – defaults to config.mesh_spacing)
-    use_graded=True,          # True = graded mesh, False = uniform
-    fname_prefix="compare_edges"   # files will be compare_edges_sharp.png / _rounded.png
-)
-"""
 if __name__ == "__main__":
     t_start = time.time()
 
