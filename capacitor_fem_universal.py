@@ -1,4 +1,3 @@
-#Pydroid run terminal
 """
 Two-dimensional finite-element electrostatics solver.
 
