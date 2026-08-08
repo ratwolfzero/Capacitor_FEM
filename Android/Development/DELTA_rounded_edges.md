@@ -12,6 +12,7 @@ identical to the pre-delta file — see *Verification*.
 | §10 `_build_parallel_plate_geometry` | — | emits `RoundedRectangle` instead of `Rectangle` for both plates when radius > 0; re-clamps radius to snapped dims; adds `dims["edge_radius"]` |
 | §10 `_build_graded_parallel_plate_mesh` | — | widens `edge_band` to cover the fillet |
 | §10 `example_parallel_plate` | — | prints edge treatment; plot titles note radius when > 0 |
+| §9 `plot_solution` | `emag_vmin`, `emag_vmax` | new optional params, default `None` (unchanged autoscale). **General plotting utility, not rounded-edges-specific** — added so two separate calls (e.g. sharp vs. rounded) can share one `|E|` color scale; see *Known limitations* and *Usage*. |
 
 **Untouched:** `Mesh`, `assemble_stiffness`, `apply_conductors_and_solve`,
 `compute_fields`, `plot_solution`, `example_coax`, `_solve_exact_check`,
@@ -77,35 +78,48 @@ into the existing narrow-plate fallback (`plate_w ≤ 2·edge_band`).
 
 ## Known limitations: reading the `|E|` panel
 
-Two things worth knowing before comparing field plots or peak-field numbers
-across sharp vs. rounded runs. Neither is new in this delta — both are
-pre-existing characteristics of `plot_solution` / the underlying mesh — but
-`edge_radius` is what makes cross-run comparison worth doing, so they're
-easy to trip over now.
+**General to `capacitor_fem` — not caused by this delta, applies with or
+without `edge_radius`:**
 
-**Colorbar is per-plot, not absolute.** The `|E|` panel calls
-`ax.pcolormesh(X, Y, EmagG_masked, ...)` with no `vmin`/`vmax`, so each
-figure autoscales to *its own* peak. Two saved PNGs are not visually
-comparable — an unchanged interior value can render a different color
-purely because the *other* run's peak (and hence its scale) moved. Compare
-`result["C"]` or explicit sampled field values, never colorbar hue, across
-runs.
+- **Colorbar is per-plot, not absolute.** The `|E|` panel calls
+  `ax.pcolormesh(X, Y, EmagG_masked, ...)` with no `vmin`/`vmax`, so each
+  figure autoscales to *its own* peak. Any two runs with a different peak
+  field — different `h`, `voltage`, `gap`, rounded or not — aren't visually
+  comparable; an unchanged value can render a different color purely
+  because the *other* run's scale moved. Compare `result["C"]` or sampled
+  field values, never colorbar hue. **Now fixable:**
+  `plot_solution(..., emag_vmin=, emag_vmax=)` (both default `None`,
+  unchanged) lets two calls share one scale — see *Usage*.
+- **A sharp 90° conductor corner is a true field singularity**
+  (`E ~ r^-1/3`, the Motz-problem exponent for its 270° reentrant angle),
+  present in every rectangular plate before `edge_radius` existed. Its
+  FEM-reported peak grows without bound as `h` shrinks and never converges:
+  default-size plate, `edge_radius=0`: 46.3 → 56.3 → 59.8 → 69.0 →
+  85.7 kV/m for h=0.4/0.2/0.15/0.1/0.05mm, fitted exponent −0.31 vs.
+  theoretical −1/3. Rounding doesn't cause this — it's the fix for it.
 
-**Peak `|E|` at a plate edge — sharp or rounded — is not mesh-converged at
-the spacings this file uses.** A sharp 90° conductor corner has a genuine
-continuum-field singularity, `E ~ r^-1/3` (the classic Motz-problem exponent
-for its 270° reentrant field angle); its FEM-reported peak grows without
-bound as `h` shrinks and never settles — default-size plate,
-`edge_radius=0`: 46.3 → 56.3 → 59.8 → 69.0 → 85.7 kV/m for
-h = 0.4/0.2/0.15/0.1/0.05 mm, fitted exponent −0.31 vs. theoretical −1/3. A
-rounded corner has a genuine finite limit, but this structured-grid mesh
-represents the arc only through node membership (no local 2-D refinement
-there), so it approaches that limit slowly and non-monotonically — same
-plate, `edge_radius=0.5mm`: 52.5 → 56.3 → 55.9 → 59.7 → 62.3 kV/m over the
-same five spacings, roughly 5× less sensitive than the sharp case at the
-finest step but not settled. Trust `C`, `C_ideal`, and field values away
-from plate edges (Verification #6); treat any near-edge peak reading as
-order-of-magnitude only.
+**Specific to `edge_radius > 0`:** the now-*finite* rounded-corner peak
+still converges slowly and non-monotonically on this mesh — same plate,
+`edge_radius=0.5mm`: 52.5 → 56.3 → 55.9 → 59.7 → 62.3 kV/m over the same
+five spacings, ~5× less sensitive than the sharp case at the finest step
+but not settled. This is *not* because rounding "reduces the singularity"
+— it's the generic cost of representing any curved boundary via node
+membership on a structured grid with no local 2-D refinement (the same
+mechanism already applies to `Circle`/`OutsideCircle` in `example_coax`;
+rounding just brings it into the parallel-plate example for the first
+time). Concretely, in `_build_graded_parallel_plate_mesh`: both the
+x-spacing near a plate edge (`edge_spacing_factor · h`) and the y-spacing
+through the plate thickness (`plate_spacing_factor · h`) scale with `h`
+alone, not with `radius` — so the number of mesh points spanning the arc
+scales as `r/h` in both directions. At `r=0.5mm` (capped at half the 1mm
+plate thickness) and `h=0.05mm`, that's `r/h=10`: not enough for a smooth
+approximation of a curve. A larger radius (thicker plate) would likely
+converge faster, since more points would land on a bigger circle at the
+same `h` — not tested here.
+
+Trust `C`, `C_ideal`, and field values away from plate edges (Verification
+#6) regardless of `edge_radius`; treat any near-edge peak reading — sharp
+or rounded — as order-of-magnitude only.
 
 ## Out of scope
 
@@ -134,10 +148,43 @@ order-of-magnitude only.
    `edge_radius=0` vs `0.5mm` at `h=0.1mm` (default finest spacing) — agree
    to ≤0.015%, and both match the ideal 1D series-capacitor formula to
    ~0.001%. Rounding the edges doesn't perturb the field away from them.
+7. **`emag_vmin`/`emag_vmax`**: isolated check that `pcolormesh(...,
+   vmin=X, vmax=Y)` clips to exactly `(X, Y)` and reproduces plain
+   autoscale when both are `None`; generated a shared-scale sharp-vs-rounded
+   comparison and confirmed both colorbars now show the same range with the
+   interior rendering identically in both (difference correctly localized
+   to the corners); confirmed a full `example_parallel_plate()` call with
+   no override reproduces the pre-addition output byte-for-byte.
 
 ## Usage
 
 ```python
 config = ParallelPlateConfig(edge_radius=0.4e-3)  # 0.4 mm fillet, both plates
 C, C_ideal, results, graded = example_parallel_plate(config)
+```
+
+**Comparable-scale sharp vs. rounded plots** (see *Known limitations*):
+
+```python
+import numpy as np
+
+def emag_peak(result):
+    mesh = result["mesh"]
+    X, Y = np.meshgrid(mesh.xs, mesh.ys)
+    dVdy, dVdx = np.gradient(result["V"].reshape(mesh.ny, mesh.nx), mesh.ys, mesh.xs)
+    Emag = np.hypot(dVdx, dVdy)
+    cond = np.zeros_like(X, dtype=bool)
+    for c in result["conductors"]:
+        cond |= c.contains(X, Y)
+    return np.ma.masked_where(cond, Emag).max()
+
+h = 0.1e-3
+r_sharp   = _solve_parallel_plate(ParallelPlateConfig(edge_radius=0.0),    h, use_graded=True)
+r_rounded = _solve_parallel_plate(ParallelPlateConfig(edge_radius=0.4e-3), h, use_graded=True)
+shared_vmax = max(emag_peak(r_sharp), emag_peak(r_rounded))
+
+for label, r in [("sharp", r_sharp), ("rounded", r_rounded)]:
+    plot_solution(r["mesh"], r["V"], r["eps_r_of_xy"], r["energy_density"],
+                 r["conductors"], r["is_fixed"], f"{label} edges", f"{label}.png",
+                 Ex=r["Ex"], Ey=r["Ey"], emag_vmin=0.0, emag_vmax=shared_vmax)
 ```

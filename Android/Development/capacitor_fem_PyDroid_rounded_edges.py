@@ -943,9 +943,16 @@ def _show_blocking_figure(fig, message=None):
 
 def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
                   title, fname, xlim=None, ylim=None, style=None,
-                  Ex=None, Ey=None):
+                  Ex=None, Ey=None, emag_vmin=None, emag_vmax=None):
     """Four-panel summary: dielectric map, equipotentials, field magnitude
-    with streamlines, and energy density (log scale)."""
+    with streamlines, and energy density (log scale).
+
+    emag_vmin / emag_vmax: fix the |E| panel's color scale instead of
+    autoscaling to this call's own min/max. Both default to None (current
+    behavior, unchanged). Use this to make two separate plot_solution()
+    calls (e.g. a sharp-edge and a rounded-edge run) share one color scale
+    so they're visually comparable -- see DELTA_rounded_edges.md, "Known
+    limitations", for why that matters."""
     style = style or PlotConfig()
     xs, ys, nx, ny = mesh.xs, mesh.ys, mesh.nx, mesh.ny
     X, Y = np.meshgrid(xs, ys)
@@ -1007,7 +1014,8 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
 
     # Panel 3: field magnitude + streamlines
     ax = axes[1, 0]
-    pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno)
+    pcm = ax.pcolormesh(X, Y, EmagG_masked, shading="auto", cmap=cmap_inferno,
+                        vmin=emag_vmin, vmax=emag_vmax)
     fig.colorbar(pcm, ax=ax, label="|E| [V/m]")
 
     ExG_plot = np.where(cond_grid, 0.0, ExG)
