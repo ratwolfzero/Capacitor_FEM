@@ -9,7 +9,7 @@ Pure NumPy / SciPy / Matplotlib. No mesh-generation library, no compiled extensi
 no native dependencies. One file, runs anywhere.
 
 ```bash
-python3 capacitor_fem.py
+python3 capacitor_fem_universal.py
 ```
 
 This document covers the physics, the mathematics, the numerical method, the software
@@ -33,18 +33,32 @@ its development history, known limitations, and future work.
 - The code now includes conservative safeguards for underdetermined solves,
   degenerate-triangle warnings, and more consistent FEM-field-based plotting,
   while preserving the same direct sparse-solve approach and dependency set.
-- - `ParallelPlateConfig` and `CoaxConfig` now validate the physical sanity of
+- `ParallelPlateConfig` and `CoaxConfig` now validate the physical sanity of
   every geometry/material field on construction (positive lengths, a
   dielectric slab that fits inside the gap, positive permittivities, nonzero
   voltage), and the parallel-plate geometry builders re-check gap/plate
   thickness/dielectric-vs-gap after `snap_to_grid` so an otherwise-valid
   config can't be pushed into an invalid one by grid rounding at a
   particular `h` without raising a specific, actionable error.
-- **Further development is carried out on**
-  (`capacitor_fem_universal.py`). That script contains robustness
-  improvements for Pydroid 3 but runs unchanged on desktop, Jupyter /
-  Carnets (static plots), and Pydroid 3 — it is the universal version.
-  See §7.1.1.
+- Parallel plates optionally take rounded (filleted) edges via
+  `ParallelPlateConfig.edge_radius` and a new `RoundedRectangle` shape, used
+  in place of `Rectangle` for both plates whenever the radius is nonzero.
+  Opt-in and bit-for-bit backward compatible — `edge_radius=0.0`, the
+  default, reproduces the sharp-cornered solve exactly. See §5.3, §7.4,
+  §8.4, §9.3.
+- A general two-run comparison tool, `compare_parallel_plate_runs`, solves
+  any two `ParallelPlateConfig` objects — differing in whatever field(s) the
+  caller chooses, not only `edge_radius` — and plots both on one shared
+  `|E|` color scale, since `plot_solution()`'s field panel otherwise
+  autoscales independently per call and can make an *unchanged* interior
+  field look like it moved. See §7.5, §10.5.
+- **`capacitor_fem_universal.py` — the renamed, current form of the
+  Android / Pydroid development path — is the basis for any further
+  development.** It contains the robustness improvements above, plus the
+  rounded-edge and comparison-tool additions, and runs unchanged on
+  desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android. The
+  original desktop-only `capacitor_fem.py` is retained for reference and
+  bit-compatible core numerics. See §7.1.2.
 
 ## Historical delta from the original version
 
@@ -70,6 +84,17 @@ its development history, known limitations, and future work.
   instead. `Rectangle`/`Circle`/`OutsideCircle` also reject non-positive
   width/height/radius at construction, and `capacitance_from_energy` rejects
   `V_hi == V_lo` instead of silently returning NaN.
+- Optional rounded (filleted) plate edges: a new `RoundedRectangle` shape and
+  `ParallelPlateConfig.edge_radius`, validated at construction against
+  `0.5·min(plate_thickness, bottom_plate_width, top_plate_width)` (the
+  largest radius that doesn't make the four fillets on one plate overlap),
+  and re-clamped against the grid-snapped dimensions at each mesh spacing so
+  a coarse step of a convergence sweep can't push a nominally-valid radius
+  into an invalid one. The graded mesh's edge-refinement band widens to
+  cover the fillet. See §5.3, §7.4, §8.4, §9.3.
+- A general `compare_parallel_plate_runs(config_a, config_b, ...)` solves
+  any two configs and plots both on one shared `|E|` color scale, addressing
+  `plot_solution()`'s per-plot autoscaling (§7.5, §10.5).
 
 ### Known limitations that remain
 
@@ -79,6 +104,10 @@ its development history, known limitations, and future work.
   significant memory.
 - Material assignment is still sampled at element centroids, which is exact for
   axis-aligned grid-snapped regions but approximate for truly curved interfaces.
+- Peak `|E|` reported near any plate edge — sharp or rounded — is not
+  mesh-converged at the spacings this project ships with; only the bulk
+  field away from an edge, and integrated quantities like `C`, are
+  trustworthy at shipped resolution. See §10.5.
 - The solver is intended as a practical engineering approximation for education,
   basic design comparison, and material selection. It is not intended as a
   high-accuracy tool for detailed design work where curved boundaries, sharp
@@ -124,16 +153,21 @@ its development history, known limitations, and future work.
   - [6. Installation](#6-installation)
   - [7. Usage](#7-usage)
     - [7.1 Running the Examples](#71-running-the-examples)
-    - [7.1.1 Universal development path](#711-universal-development-path)
+    - [7.1.1 Jupyter](#711-jupyter)
+    - [7.1.2 Android / Pydroid (universal development path)](#712-android--pydroid-universal-development-path)
     - [7.2 Quick Start](#72-quick-start)
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
+    - [7.4 Rounded Plate Edges](#74-rounded-plate-edges)
+    - [7.5 Comparing Two Runs on a Shared Color Scale](#75-comparing-two-runs-on-a-shared-color-scale)
   - [8. Validation and Verification](#8-validation-and-verification)
     - [8.1 Exact Analytical Check](#81-exact-analytical-check)
     - [8.2 Mesh Convergence](#82-mesh-convergence)
     - [8.3 Material Quadrature: A Negative Result](#83-material-quadrature-a-negative-result)
+    - [8.4 Rounded-Edge Geometry: Verification](#84-rounded-edge-geometry-verification)
   - [9. Worked Examples](#9-worked-examples)
     - [9.1 Parallel-Plate Capacitor with a Partial Dielectric Slab](#91-parallel-plate-capacitor-with-a-partial-dielectric-slab)
     - [9.2 Coaxial Cable](#92-coaxial-cable)
+    - [9.3 Rounded Plate Edges: Sharp vs. Rounded](#93-rounded-plate-edges-sharp-vs-rounded)
   - [10. Known Limitations](#10-known-limitations)
   - [11. Future Work](#11-future-work)
 
@@ -452,7 +486,7 @@ unrelated to mesh choice.
 ```text
 1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
 2. GEOMETRY         Shape (base, with CSG |, &, - operators),
-                     Circle / Rectangle / OutsideCircle
+                     Circle / Rectangle / RoundedRectangle / OutsideCircle
 3. MATERIALS        Material, make_eps_r_function()
 4. MESH             snap_to_grid(), structured triangular Mesh
 5. SOLVER           evaluate_material(), assemble_stiffness(),
@@ -460,8 +494,10 @@ unrelated to mesh choice.
 6. POST-PROCESSING  compute_fields(), capacitance_from_energy()
 7. HIGH-LEVEL API   ElectrostaticProblem
 8. VISUALIZATION    plot_solution()
-9. EXAMPLES         parallel-plate capacitor, coaxial cable, and an
-                    exact-solution validation check (off by default)
+9. EXAMPLES         parallel-plate capacitor (optionally with rounded
+                    plate edges), coaxial cable, an exact-solution
+                    validation check (off by default), and a general
+                    two-run comparison tool
 ```
 
 Each section is deliberately small and depends only on the interfaces of the
@@ -476,7 +512,7 @@ the two worked examples is a field on a frozen `dataclass`, rather than a bare
 literal buried in a function body:
 
 ```python
-from capacitor_fem import ParallelPlateConfig
+from capacitor_fem_universal import ParallelPlateConfig
 import dataclasses
 
 default = ParallelPlateConfig()                          # the shipped example
@@ -518,6 +554,13 @@ and trigger the ratio-derivation only when `mesh_spacing` has changed while
 `convergence_spacings` is detected as still equal to that literal default. See
 §10.4 for this as a general limitation, independent of this specific fix.
 
+`ParallelPlateConfig.edge_radius` (§7.4) is validated by the same discipline:
+`__post_init__` requires `0 ≤ edge_radius ≤ 0.5·min(plate_thickness,
+bottom_plate_width, top_plate_width)`, and the parallel-plate geometry
+builder re-derives that bound against the grid-snapped dimensions at each
+`h` — extending the "don't let grid rounding silently invalidate an
+otherwise-valid config" principle above to this newer field (§8.4).
+
 ### 5.3 Geometry and CSG
 
 Every shape implements one method, `contains(x, y)`, returning a boolean mask.
@@ -526,7 +569,7 @@ it at triangle centroids, the solver calls it at mesh nodes, plotting calls it o
 a full grid. Shapes compose with ordinary set operators:
 
 ```python
-from capacitor_fem import Circle, Rectangle
+from capacitor_fem_universal import Circle, Rectangle
 
 annulus = Circle((0, 0), 10e-3, eps_r=4.5) - Circle((0, 0), 6e-3)   # a - b: difference
 union = Circle((0, 0), 5e-3) | Rectangle(0, 0, 10e-3, 10e-3)         # a | b: union
@@ -536,6 +579,25 @@ both = Circle((0, 0), 5e-3) & Rectangle(0, 0, 10e-3, 10e-3)          # a & b: in
 each returning a new `Shape` whose `contains()` combines the operands' with the
 matching NumPy boolean operator — no other code needs to change to support a
 composite shape, since nothing downstream ever inspects a shape's concrete type.
+
+`RoundedRectangle(x0, y0, width, height, radius, ...)` is one more `Shape`
+implementing that same interface: a rectangle with all four corners filleted
+to a common radius, used for the parallel-plate example's optional
+`edge_radius` (§7.4). Its `contains()` is an exact rounded-box
+signed-distance test, not a polygon approximation — with $c_x,c_y$ the
+rectangle's center and $e_x = \text{width}/2-r$, $e_y = \text{height}/2-r$:
+
+$$q_x = |x-c_x|-e_x, \qquad q_y = |y-c_y|-e_y$$
+
+$$d = \sqrt{\max(q_x,0)^2+\max(q_y,0)^2} \;+\; \min(\max(q_x,q_y),\,0) \;-\; r$$
+
+a point is inside iff $d \le$ `BOUNDARY_TOLERANCE_M`. Straight sides reduce to
+the ordinary rectangle test; near a corner it falls back to "distance to the
+fillet's center, minus $r$" — the disk that rounds that corner. `radius=0`
+short-circuits to `Rectangle`'s own test and reproduces it exactly, not just
+approximately, which is why `edge_radius=0.0` (the `ParallelPlateConfig`
+default) is bit-for-bit unchanged from before this shape existed (§8.4).
+Composes with `|`, `&`, `-` like every other `Shape`.
 
 ### 5.4 High-Level API
 
@@ -555,7 +617,7 @@ Nothing there is new numerics — it's the same four functions from SOLVER and
 POST-PROCESSING, called for you. From outside, using the facade looks like this:
 
 ```python
-from capacitor_fem import ElectrostaticProblem, Mesh, Circle, OutsideCircle
+from capacitor_fem_universal import ElectrostaticProblem, Mesh, Circle, OutsideCircle
 
 mesh = Mesh(x0=-17e-3, y0=-17e-3, Lx=34e-3, Ly=34e-3, nx=454, ny=454)
 
@@ -597,7 +659,7 @@ newer syntax). No compiled extensions, no system packages, no `gmsh`.
 ### 7.1 Running the Examples
 
 ```bash
-python3 capacitor_fem.py
+python3 capacitor_fem_universal.py
 ```
 
 Runs both worked examples end-to-end: a mesh-convergence sweep, a comparison
@@ -611,15 +673,20 @@ backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
 introduce close lag. If a window is put into full-screen with the
 green traffic-light button, exit with **Ctrl+F**.
 
-### 7.1.1 Universal development path
+### 7.1.1 Jupyter
 
-Further development is carried out on
-(`capacitor_fem_universal.py`). That file
-contains robustness improvements for Pydroid 3 on Android, but the same
-script runs unchanged on desktop, Jupyter / Carnets (with static plots),
-and Pydroid 3 for Android — it is therefore the **universal** version of
-the solver. Prefer it for new work; the desktop-only `capacitor_fem.py`
-is retained for reference and bit-compatible core numerics.
+Jupyter / Carnets (iOS) note
+The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
+
+### 7.1.2 Android / Pydroid (universal development path)
+
+Further development is carried out on `capacitor_fem_universal.py` (and the
+Android folder). It contains robustness improvements for Pydroid 3 on
+Android, but the same script runs unchanged on desktop, Jupyter / Carnets
+(with static plots), and Pydroid 3 for Android — it is therefore the
+**universal** version of the solver, and the basis for any further
+development. Prefer it for new work; the desktop-only `capacitor_fem.py` is
+retained for reference and bit-compatible core numerics.
 
 The universal script includes:
 
@@ -627,23 +694,21 @@ The universal script includes:
   while still writing PNGs when `SAVE_FIGURES = True`.
 - Detection of the Android / Pydroid environment so desktop and notebook
   behaviour remains interactive where a GUI is available.
-- Additional features developed on this path (e.g. optional rounded plate
-  edges via `edge_radius`, shared-scale comparison helper) that remain
-  fully usable on every supported platform.
-
-See  `DELTA_rounded_edges.md` for details of the
-latest changes.
+- Optional rounded plate edges (`edge_radius`) and a general run-comparison
+  tool (`compare_parallel_plate_runs`), both fully usable on every
+  supported platform — see §7.4, §7.5, §8.4, §9.3, and §10.5 for the
+  details, verification, worked example, and known limitations.
 
 ### 7.2 Quick Start
 
 ```python
-from capacitor_fem import ParallelPlateConfig, example_parallel_plate, CoaxConfig, example_coax
+from capacitor_fem_universal import ParallelPlateConfig, example_parallel_plate, CoaxConfig, example_coax
 
 # Run with the defaults shown in this README:
-C, C_ideal = example_parallel_plate()
+C_uniform, C_ideal, results, graded = example_parallel_plate()
 
 # Or override any parameter:
-C, C_ideal = example_coax(CoaxConfig(dielectric_eps_r=1.0))   # air-filled instead of PE
+C, C_ideal, results = example_coax(CoaxConfig(dielectric_eps_r=1.0))   # air-filled instead of PE
 ```
 
 Or use the low-level pipeline directly for full control — see §5.4 and the
@@ -666,6 +731,73 @@ signatures and what each returns.
 
 No part of this requires touching `assemble_stiffness`, `compute_fields`, or
 `plot_solution`.
+
+### 7.4 Rounded Plate Edges
+
+`ParallelPlateConfig.edge_radius` (meters, default `0.0`) fillets all four
+corners of both plates to a common radius, replacing `Rectangle` with
+`RoundedRectangle` (§5.3) for both conductors:
+
+```python
+from capacitor_fem_universal import ParallelPlateConfig, example_parallel_plate
+
+config = ParallelPlateConfig(edge_radius=0.4e-3)   # 0.4 mm fillet, both plates
+C_uniform, C_ideal, results, graded = example_parallel_plate(config)
+```
+
+`edge_radius=0.0` is not an approximation of the sharp case — it *is* the
+sharp case, bit-for-bit (§5.3, §8.4). The bound is `edge_radius ≤
+0.5·min(plate_thickness, bottom_plate_width, top_plate_width)`; exceeding
+it raises `ValueError` at construction rather than silently producing
+overlapping fillets. The largest radius a given plate allows is that same
+formula:
+
+```python
+max_radius = 0.5 * min(config.plate_thickness,
+                        config.bottom_plate_width,
+                        config.top_plate_width)
+```
+
+Rounding removes the *reported* field concentration at a conductor corner —
+see §10.5 for why that reported value was never a trustworthy, converged
+number in the first place, sharp or rounded.
+
+### 7.5 Comparing Two Runs on a Shared Color Scale
+
+`plot_solution()`'s `|E|` panel has no fixed `vmin`/`vmax` (§10.5), so two
+separately-plotted runs autoscale independently and aren't visually
+comparable on their own. `compare_parallel_plate_runs(config_a, config_b,
+...)` solves both and plots them on one shared scale instead — general
+enough for any two configs, not only a sharp/rounded pair:
+
+```python
+from dataclasses import replace
+from capacitor_fem_universal import ParallelPlateConfig, compare_parallel_plate_runs
+
+base = ParallelPlateConfig()
+
+# vary one field...
+lo = replace(base, voltage=50.0)
+hi = replace(base, voltage=200.0)
+compare_parallel_plate_runs(lo, hi, label_a="50V", label_b="200V")
+
+# ...vary several at once, or hand it two fully independent configs
+asym = ParallelPlateConfig(top_plate_width=12e-3, voltage=250.0)
+compare_parallel_plate_runs(base, asym, label_a="baseline", label_b="asymmetric")
+
+# sharp vs. rounded is the same call -- nothing sharp/rounded-specific about it
+sharp   = replace(base, edge_radius=0.0)
+rounded = replace(base, edge_radius=0.4e-3)
+compare_parallel_plate_runs(sharp, rounded, label_a="sharp", label_b="rounded")
+```
+
+Each call solves both configs at one `h` (defaulting to
+`config_a.mesh_spacing`), prints `C` and the peak `|E|` for each, lists
+which config fields actually differ, and saves two PNGs —
+`{fname_prefix}_{label}.png` — sharing one color scale. Each plot is framed
+from its *own* geometry, so it stays correct even when the varied parameter
+changes the bounding box, e.g. a plate-width comparison. See §8.4 for what's
+been verified about this function and §9.3 for a worked example.
 
 ## 8. Validation and Verification
 
@@ -818,6 +950,66 @@ classification, which finer material sampling doesn't touch. **Conclusion:**
 multi-point material quadrature is not a worthwhile addition to this codebase as
 it stands; the conductor boundary itself (§10.1) is the binding constraint.
 
+### 8.4 Rounded-Edge Geometry: Verification
+
+Following §8's own standard — specific, reproducible numbers, not general
+assurances — for `RoundedRectangle`, `edge_radius`, and
+`compare_parallel_plate_runs`:
+
+1. **Regression at `edge_radius=0.0`.** The geometry builder's `dims` dict,
+   both plates' `contains()` masks over a 400×300 sample grid, the nodal
+   `V` array, and `C` — compared against the pre-`edge_radius` file — are
+   bit-for-bit identical, on both the uniform and graded mesh.
+2. **`RoundedRectangle` unit checks.** `radius=0` reproduces `Rectangle`
+   exactly (§5.3); a sharp corner of the original box is excluded once
+   rounded; flat-edge midpoints remain included; an invalid radius (over
+   the bound, or negative) raises `ValueError`.
+3. **Coarse-`h` re-clamp.** At nominal `plate_thickness=1mm`,
+   `edge_radius=0.45mm` passes construction-time validation. At `h=0.4mm`,
+   `snap_to_grid` (§4.3) shrinks `plate_thickness` to `0.8mm`; the geometry
+   builder correctly re-derives the usable radius down to `0.4mm` rather
+   than raising or silently letting the fillets overlap.
+4. **Narrow-plate fallback.** `bottom_plate_width = top_plate_width = 3mm`
+   with `edge_radius=0.5mm` (the maximum this thickness allows) still
+   solves correctly on the graded mesh's narrow-plate code path.
+5. **End-to-end, shipped default plate, maximum allowed fillet.** Sharp
+   (`edge_radius=0`) vs. rounded (`edge_radius=0.5mm`, the max for a 1mm
+   plate) on `ParallelPlateConfig()`'s own geometry, graded mesh, `h=0.1mm`
+   — fillets confirmed in all four `plot_solution` panels (§9.3); `C` fell
+   from 101.8809 to 100.8248 pF/m and the reported peak `|E|` fell from
+   71758.5 to 59729.5 V/m — the expected sign for both, since rounding
+   removes part of the corner-driven excess without touching genuine
+   fringing (§10.5 on why that peak number was never a converged one,
+   sharp or rounded).
+6. **Bulk-field invariance.** `|E|` sampled at the plate center and 5–7mm
+   in from either edge, in both the dielectric and air-gap layers,
+   `edge_radius=0` vs `0.5mm` at `h=0.1mm` on the shipped default geometry
+   — agree to ≤0.015%, and both match the ideal 1D series-capacitor formula
+   (§9.1) to ~0.001%. Rounding the edges doesn't perturb the field away
+   from them.
+7. **`emag_vmin`/`emag_vmax`.** `pcolormesh(..., vmin=X, vmax=Y)` clips to
+   exactly `(X, Y)` and reproduces plain autoscale when both are `None`. A
+   shared-scale sharp-vs-rounded comparison renders both colorbars over the
+   same range, with the interior rendering identically in both and the
+   difference correctly localized to the corners (§9.3). A full
+   `example_parallel_plate()` call with no override reproduces the
+   pre-addition output byte-for-byte, including after
+   `_solve_parallel_plate` gained the `emag_peak` return key.
+8. **`compare_parallel_plate_runs`, general case.** A voltage comparison
+   (50V vs. 200V, else default) reproduced `C` to 5 significant figures on
+   both runs — correct, since capacitance doesn't depend on voltage — and
+   scaled peak `|E|` by `4.0001×` for an exact `4×` voltage ratio, as
+   linear electrostatics requires. A plate-width comparison (8mm vs. 16mm)
+   correctly flagged both `bottom_plate_width` and `top_plate_width` as
+   differing and framed each plot from its own, different bounding box. An
+   identical-config call correctly emits a warning instead of silently
+   plotting two copies of the same solve.
+
+Items above establish correctness of the mechanism at the specific
+geometries and mesh spacings tested, not a general accuracy bound — §8.2's
+convergence discipline and §10.5's caveats about near-edge peak values both
+still apply to any rounded-edge run.
+
 ## 9. Worked Examples
 
 ### 9.1 Parallel-Plate Capacitor with a Partial Dielectric Slab
@@ -847,6 +1039,41 @@ approximation of the circular boundary (§8.2, §10.1).
 
 ![Coaxial capacitor: dielectric map, equipotential contours, field lines, and energy density](example2_coax.png)
 
+### 9.3 Rounded Plate Edges: Sharp vs. Rounded
+
+The same geometry as §9.1 — shipped default `ParallelPlateConfig()`, 24 mm ×
+1 mm plates, 4 mm gap, 100 V, 2 mm glass slab — solved twice: once with
+sharp (`edge_radius=0`) corners, once with the largest fillet a 1 mm plate
+allows (`edge_radius=0.5mm`), via `compare_parallel_plate_runs` (§7.5) so
+both share one `|E|` color scale (§10.5):
+
+```python
+from dataclasses import replace
+from capacitor_fem_universal import ParallelPlateConfig, compare_parallel_plate_runs
+
+base = ParallelPlateConfig()
+sharp = replace(base, edge_radius=0.0)
+rounded = replace(base, edge_radius=0.5e-3)
+compare_parallel_plate_runs(sharp, rounded, label_a="sharp", label_b="rounded")
+```
+
+Graded mesh, $h=0.1$ mm, 101,904 nodes: $C$ falls from **101.8809 pF/m**
+(sharp) to **100.8248 pF/m** (rounded) — rounding removes part of the
+corner's excess capacitance without touching genuine fringing, consistent
+with §9.1's FEM-vs-ideal comparison. The *reported* peak `|E|` falls
+further in relative terms, from **71758.5 V/m** to **59729.5 V/m** —
+expected, but not by itself a claim that either number is a converged,
+physically precise peak field; see §10.5.
+
+![Sharp plate edges, graded mesh, shared |E| scale with the rounded case below](example3_rounded_edges_sharp.png)
+
+![Rounded plate edges (r=0.5mm), same shared |E| scale as above](example3_rounded_edges_rounded.png)
+
+Both figures share one colorbar range, so the field-line and energy-density
+panels are directly comparable: the interior/bulk field (§8.4 item 6) is
+visibly identical between them, and the only real difference is at the
+corner — a sharp point in the first figure, a softened arc in the second.
+
 ## 10. Known Limitations
 
 The finite-element formulation itself is validated, not just asserted (§8.1,
@@ -870,7 +1097,9 @@ most of its resolution far from where it's actually needed. Compounded by
 independent structured meshes at different $h$ not being *nested* refinements of
 one another (§8.2), so the usual Galerkin monotonic-convergence guarantee
 doesn't apply between them — directly visible in §8.2's non-monotonic
-parallel-plate table.
+parallel-plate table. See §10.5 for the quantitative version of this (the
+corner's field-singularity exponent, measured non-convergence of the
+reported peak with $h$, and how much a rounded corner — §7.4 — actually helps).
 
 **10.3 — Material-interface and conductor-boundary triangles have an $O(h)$
 assignment ambiguity — for boundaries that cannot be grid-aligned.** For an
@@ -902,6 +1131,58 @@ is stable. The residual geometric effect of `snap_to_grid` itself (when
 a target length does not divide evenly into *h*) remains and is
 documented separately in §4.3 and §8.2.
 
+**10.5 — Reading the `|E|` panel: per-plot color scaling and corner-peak
+convergence.** Two distinct effects, easy to conflate when comparing two
+`plot_solution()` figures side by side.
+
+*Colorbar is per-plot, not absolute.* The `|E|` panel calls
+`ax.pcolormesh(X, Y, EmagG_masked, ...)` with no `vmin`/`vmax`, so each
+figure autoscales to its own peak. Any two runs with a different peak field
+— different `h`, `voltage`, `gap`, rounded or not — aren't visually
+comparable side by side: an unchanged interior value can render a different
+color purely because the *other* run's peak, and hence its scale, moved.
+`compare_parallel_plate_runs` (§7.5) exists specifically so two runs can
+share one scale; pass `emag_vmin`/`emag_vmax` to `plot_solution` directly
+for finer control.
+
+*A sharp 90° conductor corner is a true field singularity, and its
+FEM-reported peak is not a converged number.* Near a 90° conductor wedge
+protruding into a 270° field region, the classic 2D corner-singularity
+result (the same reentrant-angle problem as the "Motz problem" benchmark in
+adaptive-FEM literature) gives potential $\sim r^{2/3}$ and field
+$\sim r^{-1/3}$ as $r\to 0$ — a genuine, unbounded divergence, not merely
+"very large." Refining the mesh at a sharp corner does not converge to a
+finite answer; it approaches the singularity more closely and reports a
+larger number:
+
+| $h$ (mm) | reported peak field, sharp (kV/m) | reported peak field, rounded $r=0.5$mm (kV/m) |
+| -------: | ---------------------------------: | -----------------------------------------------: |
+|    0.400 |                                46.3 |                                               52.5 |
+|    0.200 |                                56.3 |                                               56.3 |
+|    0.150 |                                59.8 |                                               55.9 |
+|    0.100 |                                69.0 |                                               59.7 |
+|    0.050 |                                85.7 |                                               62.3 |
+
+(default-size plate; least-squares fitted growth exponent for the sharp
+column across all five points, −0.30, is close to the theoretical −1/3).
+The rounded corner has a genuine finite limit — but this structured-grid
+mesh represents the arc only through node membership, with no local 2-D
+refinement there (the same mechanism as `Circle`/`OutsideCircle` in
+`example_coax`, §10.1, §10.3), so it approaches that limit slowly and
+non-monotonically: about 5.6× less sensitive than the sharp column at the
+finest step shown (+4.3% vs. +24.1% over that last halving of $h$), but not
+settled by $h=0.05$mm either. Concretely, in the graded-mesh builder, both
+the $x$-spacing near a plate edge and the $y$-spacing through the plate
+thickness scale with $h$ alone, not with `radius` — so the number of mesh
+points actually spanning the fillet scales as $r/h$ in both directions,
+which is only 10 at $r=0.5$mm, $h=0.05$mm.
+
+**Practical consequence:** trust `C`, `C_ideal`, and `|E|` away from a
+plate edge (§8.4 item 6) at shipped mesh spacings. Treat any peak-`|E|`
+reading near an edge — sharp or rounded, whether read from a plot or from
+`result["emag_peak"]` — as order-of-magnitude only, unless local 2-D mesh
+refinement is added at that boundary (§11).
+
 ## 11. Future Work
 
 Ordered roughly by leverage (how much of §10 it addresses) against cost (new
@@ -928,7 +1209,13 @@ dependencies, implementation complexity):
   described there. It does *not* address §10.1, since a graded Cartesian grid
   still cannot conform to a curved boundary; only an unstructured mesh does that.
   The cost is implementing and validating a grading scheme correctly (a real,
-  bounded piece of engineering, not a config toggle).
+  bounded piece of engineering, not a config toggle). §10.5 gives concrete,
+  measured evidence this remains the binding constraint even for a *rounded*
+  corner: the current graded-mesh builder sets per-direction spacing from `h`
+  alone, not from the local feature size, so the number of points actually
+  spanning a fillet of radius $r$ is only $r/h$ — resolving it well would need
+  spacing that scales with $r$ near the arc specifically, not just a finer
+  global `h`.
 
 - **Boundary-represented conductors.** Mesh only the dielectric region and apply
   the Dirichlet condition on the boundary contour of a hole, instead of filling
@@ -968,6 +1255,14 @@ dependencies, implementation complexity):
 
 - **3D / tetrahedral elements**: the same weak form and the same assembly
   pattern, with 4-node tetrahedral shape functions in place of 3-node triangles.
+
+- **Independent bottom/top plate fillet radii.** `edge_radius` (§7.4) is
+  currently one field shared by both plates, mirroring how
+  `plate_thickness` already works. Splitting it into two fields is a small,
+  low-risk addition if asymmetric rounding is ever needed — not pursued so
+  far because nothing in the physics or the existing asymmetric-width
+  studies (independent `bottom_plate_width`/`top_plate_width`) has required
+  it.
 
 Everything above is ordered by how much of §10 (accuracy) it addresses. The
 two items below are a different axis entirely — memory and runtime (§4.6) —
