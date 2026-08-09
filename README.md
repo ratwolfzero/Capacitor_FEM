@@ -1,4 +1,4 @@
-# capacitor-fem
+# capacitor-fem (capacitor_fem_universal.py) is the latest, fully featured version and the primary development version. All future development will continue here
 
 A self-contained 2D finite-element electrostatics solver for simulating real capacitor
 geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple
@@ -121,7 +121,7 @@ its development history, known limitations, and future work.
 
 ## Table of Contents
 
-- [capacitor-fem](#capacitor-fem)
+- [capacitor-fem (capacitor\_fem\_universal.py) is the latest, fully featured version and the primary development version. All future development will continue here](#capacitor-fem-capacitor_fem_universalpy-is-the-latest-fully-featured-version-and-the-primary-development-version-all-future-development-will-continue-here)
   - [Current implementation status](#current-implementation-status)
   - [Historical delta from the original version](#historical-delta-from-the-original-version)
     - [Implemented improvements](#implemented-improvements)
