@@ -680,10 +680,8 @@ The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plo
 
 ### 7.1.2 Android / Pydroid (universal development path)
 
-Further development is carried out on `capacitor_fem_universal.py` (and the
-Android folder). It contains robustness improvements for Pydroid 3 on
-Android, but the same script runs unchanged on desktop, Jupyter / Carnets
-(with static plots), and Pydroid 3 for Android — it is therefore the
+Further development is carried out on `capacitor_fem_universal.py`.  
+It contains robustness improvements for Pydroid 3 on Android, but the same script runs unchanged on desktop, Jupyter / Carnets(with static plots), and Pydroid 3 for Android — it is therefore the
 **universal** version of the solver, and the basis for any further
 development. Prefer it for new work; the desktop-only `capacitor_fem.py` is
 retained for reference and bit-compatible core numerics.
