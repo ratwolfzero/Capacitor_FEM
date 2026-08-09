@@ -1065,9 +1065,9 @@ further in relative terms, from **71758.5 V/m** to **59729.5 V/m** —
 expected, but not by itself a claim that either number is a converged,
 physically precise peak field; see §10.5.
 
-![Sharp plate edges, graded mesh, shared |E| scale with the rounded case below](example3_rounded_edges_sharp.png)
+![Sharp plate edges, graded mesh, shared |E| scale with the rounded case below](compare_edges_sharp.png)
 
-![Rounded plate edges (r=0.5mm), same shared |E| scale as above](example3_rounded_edges_rounded.png)
+![Rounded plate edges (r=0.5mm), same shared |E| scale as above](compare_edges_r=0.5mm.png)
 
 Both figures share one colorbar range, so the field-line and energy-density
 panels are directly comparable: the interior/bulk field (§8.4 item 6) is
