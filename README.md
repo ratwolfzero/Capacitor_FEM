@@ -54,13 +54,13 @@ its development history, known limitations, and future work.
   `|E|` color scale, since `plot_solution()`'s field panel otherwise
   autoscales independently per call and can make an *unchanged* interior
   field look like it moved. See §7.5, §10.5.
-- **`capacitor_fem_universal.py` — the renamed, current form of the
+- **`capacitor_fem_universal.py` in the main directory— the renamed, current form of the
   Android / Pydroid development path — is the basis for any further
   development.** It contains the robustness improvements above, plus the
   rounded-edge and comparison-tool additions, and runs unchanged on
   desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android. The
   original desktop-only `capacitor_fem.py` is retained for reference and
-  bit-compatible core numerics. See §7.1.2.
+  bit-compatible core numerics. See §7.1.3.
 
 ## Historical delta from the original version
 
@@ -157,7 +157,8 @@ its development history, known limitations, and future work.
   - [7. Usage](#7-usage)
     - [7.1 Running the Examples](#71-running-the-examples)
     - [7.1.1 Jupyter](#711-jupyter)
-    - [7.1.2 Android / Pydroid (universal development path)](#712-android--pydroid-universal-development-path)
+    - [7.1.2 Android / Pydroid in the Android Folder](#712-android--pydroid-in-the-android-folder)
+    - [7.1.3 Further development](#713-further-development)
     - [7.2 Quick Start](#72-quick-start)
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
     - [7.4 Rounded Plate Edges](#74-rounded-plate-edges)
@@ -681,13 +682,13 @@ green traffic-light button, exit with **Ctrl+F**.
 Jupyter / Carnets (iOS) note
 The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
 
-### 7.1.2 Android / Pydroid (universal development path)
+### 7.1.2 Android / Pydroid in the Android Folder
 
-Further development is carried out on `capacitor_fem_universal.py`.  
-It contains robustness improvements for Pydroid 3 on Android, but the same script runs unchanged on desktop, Jupyter / Carnets(with static plots), and Pydroid 3 for Android — it is therefore the
-**universal** version of the solver, and the basis for any further
-development. Prefer it for new work; the desktop-only `capacitor_fem.py` is
-retained for reference and bit-compatible core numerics.
+It contains robustness improvements for Pydroid 3 on Android, but the same script runs unchanged on desktop, Jupyter / Carnets(with static plots), and Pydroid 3 for Android
+
+### 7.1.3 Further development
+
+Further development is carried out on `capacitor_fem_universal.py` in the main directory.  
 
 The universal script includes:
 
@@ -699,6 +700,9 @@ The universal script includes:
   tool (`compare_parallel_plate_runs`), both fully usable on every
   supported platform — see §7.4, §7.5, §8.4, §9.3, and §10.5 for the
   details, verification, worked example, and known limitations.
+
+Prefer it for new work; the desktop-only `capacitor_fem.py` is
+retained for reference and bit-compatible core numerics.
 
 ### 7.2 Quick Start
 
