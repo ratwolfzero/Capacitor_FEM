@@ -1187,8 +1187,8 @@ $\sim r^{-1/3}$ as $r\to 0$ — a genuine, unbounded divergence, not merely
 finite answer; it approaches the singularity more closely and reports a
 larger number:
 
-| $h$ (mm) | reported peak field, sharp (kV/m) | reported peak field, rounded $r=0.5$mm (kV/m) |
-| -------: | ---------------------------------: | -----------------------------------------------: |
+| $h$ (mm) | reported peak field, sharp (kV/m)   | reported peak field, rounded $r=0.5$mm (kV/m)      |
+| -------: | ---------------------------------:  | -----------------------------------------------:   |
 |    0.400 |                                46.3 |                                               52.5 |
 |    0.200 |                                56.3 |                                               56.3 |
 |    0.150 |                                59.8 |                                               55.9 |
