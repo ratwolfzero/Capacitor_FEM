@@ -488,21 +488,29 @@ unrelated to mesh choice.
 ### 5.1 Module Layout
 
 ```text
-1. CONFIGURATION    ParallelPlateConfig, CoaxConfig, PlotConfig
-2. GEOMETRY         Shape (base, with CSG |, &, - operators),
-                     Circle / Rectangle / RoundedRectangle / OutsideCircle
-3. MATERIALS        Material, make_eps_r_function()
-4. MESH             snap_to_grid(), structured triangular Mesh
-5. SOLVER           evaluate_material(), assemble_stiffness(),
-                     apply_conductors_and_solve()
-6. POST-PROCESSING  compute_fields(), capacitance_from_energy()
-7. HIGH-LEVEL API   ElectrostaticProblem
-8. VISUALIZATION    plot_solution()
-9. EXAMPLES         parallel-plate capacitor (optionally with rounded
-                    plate edges), coaxial cable, an exact-solution
-                    validation check (off by default), and a general
-                    two-run comparison tool
+0.  RUNTIME SWITCHES  Execution toggles (RUN_EXACT_CHECK, SAVE_FIGURES, ...),
+                      OUTPUT_DIR, and BOUNDARY_TOLERANCE_M (§10.4)
+1.  PHYSICS CONSTANTS EPS0, plus a startup guard on BOUNDARY_TOLERANCE_M
+2.  CONFIGURATION     ParallelPlateConfig, CoaxConfig, PlotConfig
+3.  GEOMETRY          Shape (base, with CSG |, &, - operators),
+                      Circle / Rectangle / RoundedRectangle / OutsideCircle
+4.  MATERIALS         Material, make_eps_r_function()
+5.  MESH              snap_to_grid(), structured triangular Mesh
+6.  SOLVER            evaluate_material(), assemble_stiffness(),
+                      apply_conductors_and_solve()
+7.  POST-PROCESSING   compute_fields(), capacitance_from_energy()
+8.  HIGH-LEVEL API    ElectrostaticProblem
+9.  VISUALIZATION     plot_solution()
+10. EXAMPLES          parallel-plate capacitor (optionally with rounded
+                      plate edges), coaxial cable, an exact-solution
+                      validation check (off by default), and a general
+                      two-run comparison tool
+11. MAIN              the `if __name__ == "__main__":` block that runs
+                      when the file is executed directly (§7.1)
 ```
+
+The numbers above match the `# N. NAME` banner comments in the file exactly,
+so you can jump straight to a section by searching for e.g. `# 6. SOLVER`.
 
 Each section is deliberately small and depends only on the interfaces of the
 sections before it — `assemble_stiffness` doesn't know or care how the mesh was
@@ -666,11 +674,16 @@ newer syntax). No compiled extensions, no system packages, no `gmsh`.
 python3 capacitor_fem_universal.py
 ```
 
-Runs both worked examples end-to-end: a mesh-convergence sweep, a comparison
-against each geometry's analytical formula, and a four-panel summary figure
-(`example1_parallel_plate.png`, `example2_coax.png`). Takes roughly 15–30
-seconds on a modern laptop, dominated by the finest resolution in each
-convergence sweep.
+Runs, in order: a sharp-vs-rounded plate-edge comparison on a shared `|E|`
+scale (§7.5, §9.3 — writes `compare_edges_sharp.png` and
+`compare_edges_r=0.5mm.png`), then both worked examples end-to-end — a
+mesh-convergence sweep and a comparison against each geometry's analytical
+formula, each ending in a four-panel summary figure
+(`example1_parallel_plate.png`, `example2_coax.png`) — and finally a
+combined convergence figure (`convergence_study.png`). Takes roughly
+40–60 seconds on a modern laptop: the edge comparison alone is two more
+full solves before either worked example starts, on top of the finest
+resolution in each convergence sweep.
 
 Interactive plot windows block until closed. On macOS the platform default
 backend (normally MacOSX) is preferred; forcing TkAgg is unnecessary and can
@@ -1030,6 +1043,11 @@ difference — expected and correct, since the FEM solution also captures
 fringing fields at the plate edges that the ideal formula ignores by
 construction (see the field-line panel below).
 
+The figure itself comes from a graded-mesh solve at the same nominal $h$,
+run automatically by default (`RUN_GRADED_COMPARISON`, §5.1) — it gives
+**101.881 pF/m**, 0.04% from the uniform value above, and is exposed as
+`graded["C"]`, the fourth value `example_parallel_plate()` returns (§7.2).
+
 ![Parallel-plate capacitor: dielectric map, equipotential contours, field lines, and energy density](example1_parallel_plate.png)
 
 ### 9.2 Coaxial Cable
@@ -1059,8 +1077,17 @@ from capacitor_fem_universal import ParallelPlateConfig, compare_parallel_plate_
 base = ParallelPlateConfig()
 sharp = replace(base, edge_radius=0.0)
 rounded = replace(base, edge_radius=0.5e-3)
-compare_parallel_plate_runs(sharp, rounded, label_a="sharp", label_b="rounded")
+compare_parallel_plate_runs(
+    sharp, rounded,
+    label_a="sharp", label_b="r=0.5mm",
+    fname_prefix="compare_edges",
+)
 ```
+
+(`fname_prefix` and each label set the output filenames — `<fname_prefix>_<label>.png`,
+so `compare_edges_sharp.png` / `compare_edges_r=0.5mm.png` here — to match the
+two images below. Any other label/prefix works too; only the filenames
+change, not the numbers.)
 
 Graded mesh, $h=0.1$ mm, 101,904 nodes: $C$ falls from **101.8809 pF/m**
 (sharp) to **100.8248 pF/m** (rounded) — rounding removes part of the

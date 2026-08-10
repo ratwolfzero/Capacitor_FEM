@@ -950,8 +950,8 @@ def plot_solution(mesh, V, eps_r_of_xy, energy_density, conductors, is_fixed,
     autoscaling to this call's own min/max. Both default to None (current
     behavior, unchanged). Use this to make two separate plot_solution()
     calls (e.g. a sharp-edge and a rounded-edge run) share one color scale
-    so they're visually comparable -- see DELTA_rounded_edges.md, "Known
-    limitations", for why that matters."""
+    so they're visually comparable -- see README.md, "Known limitations"
+    (10.5), for why that matters."""
     style = style or PlotConfig()
     xs, ys, nx, ny = mesh.xs, mesh.ys, mesh.nx, mesh.ny
     X, Y = np.meshgrid(xs, ys)
@@ -1493,7 +1493,7 @@ def example_parallel_plate(config=None):
                       ylim=(graded["margin"] - config.plot_margin,
                             graded["margin"] + config.plot_margin
                             + 2 * graded["plate_t"] + graded["gap"]))
-        return C_graded, C_ideal, results, graded
+        return C_uniform, C_ideal, results, graded
 
     plot_solution(uniform["mesh"], uniform["V"], uniform["eps_r_of_xy"],
                   uniform["energy_density"], uniform["conductors"], uniform["is_fixed"],
@@ -1516,7 +1516,7 @@ def compare_parallel_plate_runs(config_a, config_b, label_a=None, label_b=None,
     width, anything. This is the general primitive; without a shared scale,
     each plot_solution() call autoscales to its own peak, so the same
     interior field can render a different color purely because the OTHER
-    run's peak moved (see DELTA_rounded_edges.md, "Known limitations").
+    run's peak moved (see README.md, "Known limitations", 10.5).
 
     HOW TO USE (step by step):
       1. Build a base config the way you normally would.
@@ -1821,7 +1821,8 @@ def print_summary(C1, C1_ideal, C2, C2_ideal, elapsed):
     print(f"total runtime: {elapsed:.2f} s")
     if SAVE_FIGURES:
         print(f"Figures written under {OUTPUT_DIR or '.'}/ "
-              f"(example1_parallel_plate.png, example2_coax.png"
+              f"(compare_edges_sharp.png, compare_edges_r=0.5mm.png, "
+              f"example1_parallel_plate.png, example2_coax.png"
               f"{', convergence_study.png' if PLOT_CONVERGENCE else ''})")
 
 
