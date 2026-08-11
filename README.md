@@ -173,6 +173,7 @@ its development history, known limitations, and future work.
     - [9.2 Coaxial Cable](#92-coaxial-cable)
     - [9.3 Rounded Plate Edges: Sharp vs. Rounded](#93-rounded-plate-edges-sharp-vs-rounded)
   - [10. Known Limitations](#10-known-limitations)
+    - [**10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**](#106--domain-size-truncation-domain_margin-is-a-second-convergence-axis)
   - [11. Future Work](#11-future-work)
 
 ## 1. Overview
@@ -1215,33 +1216,15 @@ reading near an edge — sharp or rounded, whether read from a plot or from
 `result["emag_peak"]` — as order-of-magnitude only, unless local 2-D mesh
 refinement is added at that boundary (§11).
 
-**10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis §8.2 doesn't sweep.**
-`domain_margin` (parallel-plate default: 15 mm) sets how far the outer mesh
-boundary sits from the plates. That boundary is not physically at infinity:
-per §3.1, the solver imposes the weak form's *natural* boundary condition
-there — zero prescribed normal $\mathbf{D}$, not a grounded wall — so a
-nearby truncation measurably perturbs the fringing field the plate edges
-produce. §8.2's convergence sweep holds `domain_margin` fixed (only
-snapping it to the grid alongside the other dimensions, §4.3) and varies
-mesh spacing $h$ — it checks discretization error only. Nothing in §8–§9
-has been checked for domain-size convergence.
+### **10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**
 
-Testing at `domain_margin` = 30 mm (double the default, all else fixed)
-found a small increase in computed `C`, with further increases producing
-only small additional change — consistent with, but not proof of,
-convergence toward an open-domain value somewhat above what this README
-reports at the default. This doesn't extend to `example_coax`:
-`CoaxConfig.outer_radius` is itself a grounded conductor (`OutsideCircle`
-at $V=0$), so that problem is exactly bounded regardless of
-`domain_half_width`, which only needs to be large enough for the Cartesian
-mesh to contain that grounded circle (§10.1) — a purely geometric role,
-unlike `domain_margin`'s physical one here.
+`domain_margin` (parallel-plate default: 15 mm) defines the distance from the plates to the outer boundary of the finite computational domain. Because the physical exterior is effectively open, this artificial boundary can influence the computed fringing field and therefore quantities such as capacitance.
 
-**Practical consequence:** read this README's parallel-plate `C` values as
-accurate to their stated mesh-convergence digits *at a 15 mm truncation*,
-not as domain-converged absolute values. Before relying on the last digit
-for absolute (rather than comparative) work, sweep `domain_margin` the same
-way §8.2 sweeps $h$, at a fixed, sufficiently fine $h$.
+The mesh-convergence study in §8.2 varies mesh spacing $h$ while keeping `domain_margin` fixed. It therefore tests **discretization convergence only**, not convergence with respect to the size of the computational domain.
+
+A simple check with `domain_margin` increased from 15 mm to 30 mm produced a small increase in computed $C$, with progressively smaller changes for further increases. This indicates that the default domain is reasonably stable, but is not by itself a proof of domain convergence.
+
+**Practical consequence:** the reported parallel-plate results are mesh-converged at the stated `domain_margin`, but not formally domain-converged. For absolute accuracy, `domain_margin` should be swept at a fixed, sufficiently fine $h$ in the same way that §8.2 sweeps $h$.
 
 ## 11. Future Work
 
