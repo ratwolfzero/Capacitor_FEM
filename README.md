@@ -1215,6 +1215,34 @@ reading near an edge — sharp or rounded, whether read from a plot or from
 `result["emag_peak"]` — as order-of-magnitude only, unless local 2-D mesh
 refinement is added at that boundary (§11).
 
+**10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis §8.2 doesn't sweep.**
+`domain_margin` (parallel-plate default: 15 mm) sets how far the outer mesh
+boundary sits from the plates. That boundary is not physically at infinity:
+per §3.1, the solver imposes the weak form's *natural* boundary condition
+there — zero prescribed normal $\mathbf{D}$, not a grounded wall — so a
+nearby truncation measurably perturbs the fringing field the plate edges
+produce. §8.2's convergence sweep holds `domain_margin` fixed (only
+snapping it to the grid alongside the other dimensions, §4.3) and varies
+mesh spacing $h$ — it checks discretization error only. Nothing in §8–§9
+has been checked for domain-size convergence.
+
+Testing at `domain_margin` = 30 mm (double the default, all else fixed)
+found a small increase in computed `C`, with further increases producing
+only small additional change — consistent with, but not proof of,
+convergence toward an open-domain value somewhat above what this README
+reports at the default. This doesn't extend to `example_coax`:
+`CoaxConfig.outer_radius` is itself a grounded conductor (`OutsideCircle`
+at $V=0$), so that problem is exactly bounded regardless of
+`domain_half_width`, which only needs to be large enough for the Cartesian
+mesh to contain that grounded circle (§10.1) — a purely geometric role,
+unlike `domain_margin`'s physical one here.
+
+**Practical consequence:** read this README's parallel-plate `C` values as
+accurate to their stated mesh-convergence digits *at a 15 mm truncation*,
+not as domain-converged absolute values. Before relying on the last digit
+for absolute (rather than comparative) work, sweep `domain_margin` the same
+way §8.2 sweeps $h$, at a fixed, sufficiently fine $h$.
+
 ## 11. Future Work
 
 Ordered roughly by leverage (how much of §10 it addresses) against cost (new
