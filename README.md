@@ -1203,11 +1203,11 @@ refinement there (the same mechanism as `Circle`/`OutsideCircle` in
 `example_coax`, §10.1, §10.3), so it approaches that limit slowly and
 non-monotonically: noticeably less sensitive than the sharp column
 (roughly 3–4× smaller relative change over the last halving of $h$ shown
-here), but not settled by $h=0.05$mm either. Concretely, in the graded-mesh builder, both
+here), but not settled by h=0.05mm either. Concretely, in the graded-mesh builder, both
 the $x$-spacing near a plate edge and the $y$-spacing through the plate
 thickness scale with $h$ alone, not with `radius` — so the number of mesh
 points actually spanning the fillet scales as $r/h$ in both directions,
-which is only 10 at $r=0.5$mm, $h=0.05$mm.
+which is only 10 at r=0.5mm, h=0.05mm.
 
 **Practical consequence:** trust `C`, `C_ideal`, and `|E|` away from a
 plate edge (§8.4 item 6) at shipped mesh spacings. Treat any peak-`|E|`
