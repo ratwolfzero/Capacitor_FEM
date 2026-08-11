@@ -1187,23 +1187,23 @@ $\sim r^{-1/3}$ as $r\to 0$ — a genuine, unbounded divergence, not merely
 finite answer; it approaches the singularity more closely and reports a
 larger number:
 
-| $h$ (mm) | reported peak field, sharp (kV/m)  | reported peak field, rounded r=0.5mm (kV/m)       |
-| -------: | ---------------------------------: | -----------------------------------------------:  |
-|    0.400 |                               47.4 |                                              48.2 |
-|    0.200 |                               58.2 |                                              52.1 |
-|    0.150 |                               62.0 |                                              55.9 |
-|    0.100 |                               71.8 |                                              59.7 |
-|    0.050 |                               77.7 |                                              61.1 |
+| $h$ (mm) | reported peak field, sharp (kV/m)   | reported peak field, rounded r=0.5mm (kV/m)        |
+| -------: | ---------------------------------:  | -----------------------------------------------:   |
+|    0.400 |                                47.4 |                                               48.2 |
+|    0.200 |                                58.2 |                                               52.1 |
+|    0.150 |                                62.0 |                                               55.9 |
+|    0.100 |                                71.8 |                                               59.7 |
+|    0.050 |                                77.7 |                                               61.1 |
 
 (default-size plate; a least-squares fit to the sharp column yields a growth
-exponent close to the theoretical −1/3).
-The rounded corner has a genuine finite limit — but this structured-grid
-mesh represents the arc only through node membership, with no local 2-D
-refinement there (the same mechanism as `Circle`/`OutsideCircle` in
-`example_coax`, §10.1, §10.3), so it approaches that limit slowly and
-non-monotonically: noticeably less sensitive than the sharp column
-(roughly 3–4× smaller relative change over the last halving of $h$ shown
-here), but not settled by h=0.05mm either. Concretely, in the graded-mesh builder, both
+exponent close to the theoretical −1/3). The rounded corner has a genuine
+finite limit — but this structured-grid mesh represents the arc only
+through node membership, with no local 2-D refinement there (the same
+mechanism as `Circle`/`OutsideCircle` in `example_coax`, §10.1, §10.3), so
+it approaches that limit slowly: noticeably less sensitive than the sharp
+column (roughly 3–4× smaller relative change over the last halving of $h$
+shown here), but not settled by h=0.05mm either.
+Concretely, in the graded-mesh builder, both
 the $x$-spacing near a plate edge and the $y$-spacing through the plate
 thickness scale with $h$ alone, not with `radius` — so the number of mesh
 points actually spanning the fillet scales as $r/h$ in both directions,
