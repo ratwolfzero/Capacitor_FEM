@@ -115,12 +115,6 @@ its development history, known limitations, and future work.
   high-accuracy tool for detailed design work where curved boundaries, sharp
   singularities, or highly refined geometries are dominant.
 
-### Future work
-
-- Add a truly unstructured or locally refined mesh strategy.
-- Explore iterative or symmetry-aware solvers to reduce memory pressure.
-- Extend the graded-mesh strategy to coaxial and more general geometries.
-
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
@@ -129,7 +123,6 @@ its development history, known limitations, and future work.
   - [Historical delta from the original version](#historical-delta-from-the-original-version)
     - [Implemented improvements](#implemented-improvements)
     - [Known limitations that remain](#known-limitations-that-remain)
-    - [Future work](#future-work)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
