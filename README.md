@@ -1,119 +1,42 @@
 # capacitor-fem
 
-## (capacitor_fem_universal.py) is the latest, fully featured version and the primary development version. All future development will continue here
+A self-contained 2D finite-element electrostatics solver for real capacitor geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple primitives — rather than closed-form formulas that exist only for a few idealized cases.
 
-A self-contained 2D finite-element electrostatics solver for simulating real capacitor
-geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple
-primitives — rather than relying on closed-form formulas that only exist for a handful
-of idealized geometries.
-
-Pure NumPy / SciPy / Matplotlib. No mesh-generation library, no compiled extensions,
-no native dependencies. One file, runs anywhere.
+Pure NumPy / SciPy / Matplotlib. No mesh-generation library, no compiled extensions, no native dependencies. One file, runs anywhere:
 
 ```bash
 python3 capacitor_fem_universal.py
-```
 
-This document covers the physics, the mathematics, the numerical method, the software
-architecture, and the usage of the code. It assumes familiarity with vector calculus,
-linear algebra, and Python, but not necessarily with finite elements; the derivation
-starts from Maxwell's equations and builds up from there.
 
-This repository now uses a single consolidated document for the current implementation,
-its development history, known limitations, and future work.
+capacitor_fem_universal.py is the primary development version. All future work continues there. The original desktop-only capacitor_fem.py is retained for reference and remains bit-compatible in the core numerics.
+This document covers the physics, mathematics, numerical method, software architecture, and usage of the code. It assumes familiarity with vector calculus, linear algebra, and Python, but not necessarily with finite elements; the derivation starts from Maxwell’s equations and builds up from there.
+Current status
 
-## Current implementation status
+Structured triangular mesh with optional graded Cartesian refinement for the parallel-plate example.
+Independent bottom/top plate widths; optional rounded (filleted) plate edges via edge_radius / RoundedRectangle.
+Constructor-time and post-snap_to_grid validation of geometry and material parameters.
+General two-run comparison tool (compare_parallel_plate_runs) that plots any two ParallelPlateConfigs on a shared |E| colour scale.
+Runs unchanged on desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android.
+Core FEM numerics remain a direct sparse solve; safeguards added for under-determined systems and degenerate triangles.
 
-- The solver uses a structured triangular mesh and supports optional graded Cartesian
-  refinement for the parallel-plate example.
-- The parallel-plate example supports independent plate widths and reports a
-  convergence study with optional plots.
-- Runtime switches, geometry configuration, and boundary-tolerance handling are
-  centralized in one place.
-- The implementation remains limited to structured, non-conforming meshes; curved
-  boundaries are still approximated by a staircase.
-- The code now includes conservative safeguards for underdetermined solves,
-  degenerate-triangle warnings, and more consistent FEM-field-based plotting,
-  while preserving the same direct sparse-solve approach and dependency set.
-- `ParallelPlateConfig` and `CoaxConfig` now validate the physical sanity of
-  every geometry/material field on construction (positive lengths, a
-  dielectric slab that fits inside the gap, positive permittivities, nonzero
-  voltage), and the parallel-plate geometry builders re-check gap/plate
-  thickness/dielectric-vs-gap after `snap_to_grid` so an otherwise-valid
-  config can't be pushed into an invalid one by grid rounding at a
-  particular `h` without raising a specific, actionable error.
-- Parallel plates optionally take rounded (filleted) edges via
-  `ParallelPlateConfig.edge_radius` and a new `RoundedRectangle` shape, used
-  in place of `Rectangle` for both plates whenever the radius is nonzero.
-  Opt-in and bit-for-bit backward compatible — `edge_radius=0.0`, the
-  default, reproduces the sharp-cornered solve exactly. See §5.3, §7.4,
-  §8.4, §9.3.
-- A general two-run comparison tool, `compare_parallel_plate_runs`, solves
-  any two `ParallelPlateConfig` objects — differing in whatever field(s) the
-  caller chooses, not only `edge_radius` — and plots both on one shared
-  `|E|` color scale, since `plot_solution()`'s field panel otherwise
-  autoscales independently per call and can make an *unchanged* interior
-  field look like it moved. See §7.5, §10.5.
-- **`capacitor_fem_universal.py` in the main directory— the renamed, current form of the
-  Android / Pydroid development path — is the basis for any further
-  development.** It contains the robustness improvements above, plus the
-  rounded-edge and comparison-tool additions, and runs unchanged on
-  desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android. The
-  original desktop-only `capacitor_fem.py` is retained for reference and
-  bit-compatible core numerics. See §7.1.3.
+Known limitations (summary)
 
-## Historical delta from the original version
+Structured (non-conforming) mesh: curved and non-axis-aligned boundaries are staircased (see §10.1–10.3).
+Direct sparse LU solve scales poorly in memory and time at very fine h (see §4.6).
+Peak |E| near any plate edge (sharp or rounded) is not mesh-converged at the shipped resolutions; only bulk fields and integrated quantities such as C are trustworthy (see §10.5).
+Domain-size truncation (domain_margin) is a second, independent convergence axis (see §10.6).
+Intended use: practical engineering approximation for education, basic design comparison, and material selection — not a high-accuracy tool for geometries dominated by curved boundaries or sharp singularities.
 
-### Implemented improvements
+Recent changes
 
-- Graded Cartesian mesh support via piecewise-uniform coordinate arrays and a
-  dedicated builder for the parallel-plate example.
-- Independent bottom/top plate widths for the plate example, enabling asymmetric
-  fringing studies.
-- Optional boundary-tolerance verification and a combined convergence figure.
-- Structural refactoring into small helpers and configuration classes while keeping
-  the core FEM numerics bit-compatible with the original solver.
-- Constructor-time and post-`snap_to_grid` validation for the parallel-plate and
-  coax configs. Previously, shrinking `gap` below `mesh_spacing`, or growing
-  `dielectric_thickness` past `gap`, either crashed on the graded mesh with a
-  generic "ys must be strictly increasing" (no indication *why*), or silently
-  solved a wrong problem on the uniform mesh (a dielectric slab overlapping the
-  top plate, with no error or warning). The graded-mesh builder also crashed on
-  two legitimate boundary configurations -- `dielectric_thickness = 0` (no
-  slab) and `dielectric_thickness = gap` (slab fills the whole gap) -- because
-  splitting the gap into glass/air sub-segments produced a zero-length segment
-  at those extremes; it now collapses to a single full-gap segment there
-  instead. `Rectangle`/`Circle`/`OutsideCircle` also reject non-positive
-  width/height/radius at construction, and `capacitance_from_energy` rejects
-  `V_hi == V_lo` instead of silently returning NaN.
-- Optional rounded (filleted) plate edges: a new `RoundedRectangle` shape and
-  `ParallelPlateConfig.edge_radius`, validated at construction against
-  `0.5·min(plate_thickness, bottom_plate_width, top_plate_width)` (the
-  largest radius that doesn't make the four fillets on one plate overlap),
-  and re-clamped against the grid-snapped dimensions at each mesh spacing so
-  a coarse step of a convergence sweep can't push a nominally-valid radius
-  into an invalid one. The graded mesh's edge-refinement band widens to
-  cover the fillet. See §5.3, §7.4, §8.4, §9.3.
-- A general `compare_parallel_plate_runs(config_a, config_b, ...)` solves
-  any two configs and plots both on one shared `|E|` color scale, addressing
-  `plot_solution()`'s per-plot autoscaling (§7.5, §10.5).
+Graded Cartesian mesh support and independent plate widths.
+Robust validation of geometry/material fields (including post-snap checks).
+Optional rounded plate edges (edge_radius, RoundedRectangle) with bit-for-bit compatibility at edge_radius=0.
+Shared-scale comparison tool (compare_parallel_plate_runs).
+Android / Pydroid save-only plotting path and general robustness improvements.
+Conservative handling of under-determined solves and degenerate-triangle warnings.
 
-### Known limitations that remain
-
-- The mesh is still structured and cannot conform to curved or non-axis-aligned
-  boundaries.
-- The direct sparse LU solve scales poorly at very fine mesh spacing and can require
-  significant memory.
-- Material assignment is still sampled at element centroids, which is exact for
-  axis-aligned grid-snapped regions but approximate for truly curved interfaces.
-- Peak `|E|` reported near any plate edge — sharp or rounded — is not
-  mesh-converged at the spacings this project ships with; only the bulk
-  field away from an edge, and integrated quantities like `C`, are
-  trustworthy at shipped resolution. See §10.5.
-- The solver is intended as a practical engineering approximation for education,
-  basic design comparison, and material selection. It is not intended as a
-  high-accuracy tool for detailed design work where curved boundaries, sharp
-  singularities, or highly refined geometries are dominant.
+Full discussion of each item, measured accuracy, and remaining limitations appears in the sections below.
 
 ## Table of Contents
 
