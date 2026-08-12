@@ -11,37 +11,40 @@ python3 capacitor_fem_universal.py
 capacitor_fem_universal.py is the primary development version. All future work continues there. The original desktop-only capacitor_fem.py is retained for reference and remains bit-compatible in the core numerics.
 This document covers the physics, mathematics, numerical method, software architecture, and usage of the code. It assumes familiarity with vector calculus, linear algebra, and Python, but not necessarily with finite elements; the derivation starts from Maxwell’s equations and builds up from there.
 
-Current status
+## Current status
 
-Structured triangular mesh with optional graded Cartesian refinement for the parallel-plate example.
-Independent bottom/top plate widths; optional rounded (filleted) plate edges via edge_radius / RoundedRectangle.
-Constructor-time and post-snap_to_grid validation of geometry and material parameters.
-General two-run comparison tool (compare_parallel_plate_runs) that plots any two ParallelPlateConfigs on a shared |E| colour scale.
-Runs unchanged on desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android.
-Core FEM numerics remain a direct sparse solve; safeguards added for under-determined systems and degenerate triangles.
+- Structured triangular mesh with optional graded Cartesian refinement for the parallel-plate example.
+- Independent bottom/top plate widths; optional rounded (filleted) plate edges via edge_radius / RoundedRectangle.
+- Constructor-time and post-snap_to_grid validation of geometry and material parameters.
+- General two-run comparison tool (compare_parallel_plate_runs) that plots any two ParallelPlateConfigs on a shared |E| colour scale.
+- Runs unchanged on desktop, Jupyter / Carnets (static plots), and Pydroid 3 on Android.
+- Core FEM numerics remain a direct sparse solve; safeguards added for under-determined systems and degenerate triangles.
 
-Known limitations (summary)
+## Known limitations (summary)
 
-Structured (non-conforming) mesh: curved and non-axis-aligned boundaries are staircased (see §10.1–10.3).
-Direct sparse LU solve scales poorly in memory and time at very fine h (see §4.6).
-Peak |E| near any plate edge (sharp or rounded) is not mesh-converged at the shipped resolutions; only bulk fields and integrated quantities such as C are trustworthy (see §10.5).
-Domain-size truncation (domain_margin) is a second, independent convergence axis (see §10.6).
-Intended use: practical engineering approximation for education, basic design comparison, and material selection — not a high-accuracy tool for geometries dominated by curved boundaries or sharp singularities.
+- Structured (non-conforming) mesh: curved and non-axis-aligned boundaries are staircased (see §10.1–10.3).
+- Direct sparse LU solve scales poorly in memory and time at very fine h (see §4.6).
+- Peak |E| near any plate edge (sharp or rounded) is not mesh-converged at the shipped resolutions; only bulk fields and integrated quantities such as C are trustworthy (see §10.5).
+- Domain-size truncation (domain_margin) is a second, independent convergence axis (see §10.6).
+- Intended use: practical engineering approximation for education, basic design comparison, and material selection — not a high-accuracy tool for geometries dominated by curved boundaries or sharp singularities.
 
-Recent changes
+## Recent changes
 
-Graded Cartesian mesh support and independent plate widths.
-Robust validation of geometry/material fields (including post-snap checks).
-Optional rounded plate edges (edge_radius, RoundedRectangle) with bit-for-bit compatibility at edge_radius=0.
-Shared-scale comparison tool (compare_parallel_plate_runs).
-Android / Pydroid save-only plotting path and general robustness improvements.
-Conservative handling of under-determined solves and degenerate-triangle warnings.
+- Graded Cartesian mesh support and independent plate widths.
+- Robust validation of geometry/material fields (including post-snap checks).
+- Optional rounded plate edges (edge_radius, RoundedRectangle) with bit-for-bit compatibility at edge_radius=0.
+- Shared-scale comparison tool (compare_parallel_plate_runs).
+- Android / Pydroid save-only plotting path and general robustness improvements.
+- Conservative handling of under-determined solves and degenerate-triangle warnings.
 
 Full discussion of each item, measured accuracy, and remaining limitations appears in the sections below.
 
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
+  - [Current status](#current-status)
+  - [Known limitations (summary)](#known-limitations-summary)
+  - [Recent changes](#recent-changes)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
