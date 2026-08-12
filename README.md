@@ -174,6 +174,13 @@ its development history, known limitations, and future work.
     - [9.3 Rounded Plate Edges: Sharp vs. Rounded](#93-rounded-plate-edges-sharp-vs-rounded)
   - [10. Known Limitations](#10-known-limitations)
   - [11. Future Work](#11-future-work)
+    - [11.1 Dependency-free path (preferred)](#111-dependency-free-path-preferred)
+      - [High priority – real FEM accuracy improvements](#high-priority--real-fem-accuracy-improvements)
+      - [Medium priority – physics extensions](#medium-priority--physics-extensions)
+      - [Lower priority / more invasive](#lower-priority--more-invasive)
+      - [Accuracy-neutral (memory / runtime)](#accuracy-neutral-memory--runtime)
+    - [11.2 Beyond structured mesh (optional – introduces dependencies)](#112-beyond-structured-mesh-optional--introduces-dependencies)
+    - [11.3 Longer-term](#113-longer-term)
 
 ## 1. Overview
 
@@ -1257,103 +1264,87 @@ for m in margins_mm:
 
 ## 11. Future Work
 
-Ordered roughly by leverage (how much of §10 it addresses) against cost (new
-dependencies, implementation complexity):
+Priority reflects three criteria, in order:
 
-- **Unstructured, conforming, adaptively refined mesh.** The highest-leverage
-  change available, addressing 10.1–10.3 at once, and 10.4 as a side effect
-  (node position and boundary position become the same computation, not two
-  values compared after the fact): a mesh generator (e.g. `pygmsh`, building on
-  `gmsh`) that conforms exactly to curved/sharp boundaries and clusters
-  resolution near conductor edges and corners. `assemble_stiffness` and
-  `compute_fields` are already agnostic to how the mesh was built — they only
-  consume `mesh.points` and `mesh.triangles` — so this is a `Mesh`-class swap,
-  not a solver rewrite. It does add `gmsh` as a native dependency, which is why
-  it isn't included by default.
+1. Impact on real FEM numerical accuracy (especially the limitations in §10).
+2. Whether the change stays fully dependency-free.
+3. Implementation complexity.
 
-- **Graded (non-uniform) structured mesh — a concrete, dependency-free
-  intermediate step.** Keep the Cartesian, dependency-free mesh, but space grid
-  lines more finely near conductor edges and corners and more coarsely away from
-  them (e.g. via geometric or `tanh` stretching along each axis) instead of the
-  uniform spacing used throughout this project. This is the one lever that would
-  still meaningfully tighten the parallel-plate corner numbers in §8.2/§10.2
-  without adding a dependency — it directly targets the under-resolution
-  described there. It does *not* address §10.1, since a graded Cartesian grid
-  still cannot conform to a curved boundary; only an unstructured mesh does that.
-  The cost is implementing and validating a grading scheme correctly (a real,
-  bounded piece of engineering, not a config toggle). §10.5 gives concrete,
-  measured evidence this remains the binding constraint even for a *rounded*
-  corner: the current graded-mesh builder sets per-direction spacing from `h`
-  alone, not from the local feature size, so the number of points actually
-  spanning a fillet of radius $r$ is only $r/h$ — resolving it well would need
-  spacing that scales with $r$ near the arc specifically, not just a finer
-  global `h`.
+### 11.1 Dependency-free path (preferred)
 
-- **Boundary-represented conductors.** Mesh only the dielectric region and apply
-  the Dirichlet condition on the boundary contour of a hole, instead of filling
-  the conductor's interior with fixed-voltage nodes. Removes §10.3, and is the
-  right foundation for surface-charge-density or Maxwell-stress-tensor output,
-  both of which want a well-defined boundary contour to evaluate along. Requires
-  the unstructured mesh above to cut a conforming hole.
+All items below stay inside pure NumPy / SciPy / Matplotlib.
 
-- **Cut-cell (sub-cell) boundary treatment.** A smaller alternative that stays on
-  a Cartesian grid: compute the actual area fraction of a boundary-straddling
-  triangle in each region and weight its contribution accordingly, instead of
-  a hard inside/outside classification. Reduces §10.3 without changing the mesh,
-  but is a real numerical method (correct partial-area integration over a
-  clipped triangle) rather than a small tweak.
+#### High priority – real FEM accuracy improvements
 
-- **Quadratic (P2) elements.** Worth doing together with the unstructured mesh,
-  not before it: on a non-conforming mesh, the dominant error on a curved
-  boundary is geometric, not the PDE-discretization error a higher element
-  order addresses. Needs curved ("isoparametric") boundary elements to pay off
-  as expected — a bigger change than plain P2, which just adds 6-node elements
-  and real quadrature without reshaping a staircased boundary into a circle.
+- **Improved graded structured mesh**  
+  **Complexity: Medium**  
+  Make spacing near edges and fillets scale with local feature size
+  (especially `edge_radius`) and/or replace piecewise-uniform segments with
+  smooth geometric or \(\tanh\) stretching. Highest-leverage remaining
+  dependency-free change; directly targets the under-resolved corners in
+  §8.2 / §10.2 / §10.5.
 
-- **Nonlinear dielectrics**, $\varepsilon(E)$: read the field from the previous
-  iteration and Picard-iterate `evaluate_material → assemble_stiffness → solve →
-  compute_fields` to convergence — the split between `evaluate_material` and
-  `assemble_stiffness` exists specifically to make this a small addition.
+- **Cut-cell (sub-cell) boundary treatment**  
+  **Complexity: Medium–High**  
+  Weight boundary-straddling triangles by the actual area fraction inside
+  each region instead of a hard inside/outside test. Reduces the \(O(h)\)
+  ambiguity of §10.3 while remaining on a Cartesian grid. Requires robust
+  triangle–shape clipping.
 
-- **Anisotropic (tensor) permittivity**: replace the scalar `eps_elem` multiply
-  in `assemble_stiffness` with a per-element $2\times2$ tensor contracted
-  against the $(b,c)$ gradient coefficients.
+#### Medium priority – physics extensions
 
-- **Floating conductors and general boundary-condition types.** Useful once
-  Neumann or floating-potential conductors are needed — a floating conductor
-  adds an extra unknown and a total-charge constraint to the linear system, a
-  real numerical feature. Worth introducing `DirichletBC`/`NeumannBC`/
-  `FloatingConductor` objects together with that work.
+- **Nonlinear dielectrics** \(\varepsilon(E)\)  
+  **Complexity: Low–Medium**  
+  Picard iteration around the existing material / assemble / solve loop.
+  Architecture already supports it cleanly.
 
-- **3D / tetrahedral elements**: the same weak form and the same assembly
-  pattern, with 4-node tetrahedral shape functions in place of 3-node triangles.
+- **Anisotropic (tensor) permittivity**  
+  **Complexity: Low**  
+  Replace the scalar multiply in `assemble_stiffness` with a per-element
+  \(2\times 2\) tensor.
 
-- **Independent bottom/top plate fillet radii.** `edge_radius` (§7.4) is
-  currently one field shared by both plates, mirroring how
-  `plate_thickness` already works. Splitting it into two fields is a small,
-  low-risk addition if asymmetric rounding is ever needed — not pursued so
-  far because nothing in the physics or the existing asymmetric-width
-  studies (independent `bottom_plate_width`/`top_plate_width`) has required
-  it.
+#### Lower priority / more invasive
 
-Everything above is ordered by how much of §10 (accuracy) it addresses. The
-two items below are a different axis entirely — memory and runtime (§4.6) —
-and don't change accuracy at all:
+- **Floating conductors and general boundary-condition types**  
+  **Complexity: Medium–High**  
+  A floating conductor is an equipotential with unknown voltage and a
+  total-charge constraint. This requires a real redesign of the current
+  Dirichlet-only reduction in `apply_conductors_and_solve` (Lagrange
+  multipliers, condensation, or similar). Doable without new dependencies,
+  but not a small extension of the existing code.
 
-- **Symmetry-aware direct solver.** `apply_conductors_and_solve` uses
-  `scipy.sparse.linalg.spsolve`, a general (non-symmetric) sparse LU
-  factorization, even though the stiffness matrix is symmetric positive
-  definite. A Cholesky-based solver aware of that (e.g.
-  `scikit-sparse`/`CHOLMOD`) does roughly half the factorization work and needs
-  less memory for the same mesh — no change to node count or accuracy, purely a
-  linear-algebra efficiency gain. Not included by default for the same reason
-  `gmsh` isn't: it's a new native dependency.
+- **Independent bottom/top plate fillet radii**  
+  **Complexity: Trivial**  
+  Split the single `edge_radius` field. Only useful if asymmetric rounding
+  is needed.
 
-- **Iterative solver.** Since the matrix is SPD, conjugate gradient is a valid
-  alternative to a direct solve, with memory that scales roughly linearly with problem size
-  (no factorization fill-in). A real trade-off, not a strict improvement: unlike
-  the current one-shot, exact direct solve, CG needs a convergence tolerance
-  and, without a decent preconditioner, can converge slowly or unpredictably on
-  this kind of problem — swapping it in naively could trade a clear memory
-  error for a worse failure mode (a run that never finishes, with no clear
-  signal why).
+#### Accuracy-neutral (memory / runtime)
+
+- **Iterative solver (CG or similar)**  
+  **Complexity: Low–Medium**  
+  Pure SciPy. Memory scales roughly linearly with problem size. Main risk
+  is convergence behaviour without a good preconditioner.
+
+### 11.2 Beyond structured mesh (optional – introduces dependencies)
+
+Listed for completeness only; not the primary development direction.
+
+- **Unstructured, conforming, adaptively refined mesh**  
+  **Complexity: High** (plus new dependency: `gmsh` / `pygmsh`)  
+  Highest possible accuracy gain. Exact curved boundaries + local
+  refinement. `assemble_stiffness` / `compute_fields` already accept
+  arbitrary meshes.
+
+- **Boundary-represented conductors**  
+  Natural companion of an unstructured mesh (requires a conforming hole).
+  Right foundation for surface-charge or Maxwell-stress output.
+
+- **Symmetry-aware direct solver** (CHOLMOD-style)  
+  **Complexity: Low–Medium** (plus native dependency)  
+  Pure performance/memory improvement; no accuracy change.
+
+### 11.3 Longer-term
+
+- Quadratic (P2) elements — limited value on a pure staircase mesh.
+- 3-D tetrahedral elements.
+- Full adaptive refinement with a posteriori error estimators.
