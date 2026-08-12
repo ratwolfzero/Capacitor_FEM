@@ -173,7 +173,6 @@ its development history, known limitations, and future work.
     - [9.2 Coaxial Cable](#92-coaxial-cable)
     - [9.3 Rounded Plate Edges: Sharp vs. Rounded](#93-rounded-plate-edges-sharp-vs-rounded)
   - [10. Known Limitations](#10-known-limitations)
-    - [**10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**](#106--domain-size-truncation-domain_margin-is-a-second-convergence-axis)
   - [11. Future Work](#11-future-work)
 
 ## 1. Overview
@@ -1216,7 +1215,7 @@ reading near an edge — sharp or rounded, whether read from a plot or from
 `result["emag_peak"]` — as order-of-magnitude only, unless local 2-D mesh
 refinement is added at that boundary (§11).
 
-### **10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**
+**10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**
 
 `domain_margin` (parallel-plate default: 15 mm) is the distance from the plates to the outer boundary of the finite computational domain. The physical exterior is open; the artificial outer boundary (natural zero-normal-$\mathbf{D}$ condition) therefore truncates fringing and slightly under-reports stored energy and $C$.
 
