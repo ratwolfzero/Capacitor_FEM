@@ -6,7 +6,7 @@ Pure NumPy / SciPy / Matplotlib. No mesh-generation library, no compiled extensi
 
 ```bash
 python3 capacitor_fem_universal.py
-
+```
 
 capacitor_fem_universal.py is the primary development version. All future work continues there. The original desktop-only capacitor_fem.py is retained for reference and remains bit-compatible in the core numerics.
 This document covers the physics, mathematics, numerical method, software architecture, and usage of the code. It assumes familiarity with vector calculus, linear algebra, and Python, but not necessarily with finite elements; the derivation starts from Maxwell’s equations and builds up from there.
@@ -41,11 +41,6 @@ Full discussion of each item, measured accuracy, and remaining limitations appea
 ## Table of Contents
 
 - [capacitor-fem](#capacitor-fem)
-  - [(capacitor\_fem\_universal.py) is the latest, fully featured version and the primary development version. All future development will continue here](#capacitor_fem_universalpy-is-the-latest-fully-featured-version-and-the-primary-development-version-all-future-development-will-continue-here)
-  - [Current implementation status](#current-implementation-status)
-  - [Historical delta from the original version](#historical-delta-from-the-original-version)
-    - [Implemented improvements](#implemented-improvements)
-    - [Known limitations that remain](#known-limitations-that-remain)
   - [Table of Contents](#table-of-contents)
   - [1. Overview](#1-overview)
   - [2. Physics: From Maxwell's Equations to the Governing PDE](#2-physics-from-maxwells-equations-to-the-governing-pde)
