@@ -1218,13 +1218,43 @@ refinement is added at that boundary (§11).
 
 ### **10.6 — Domain-size truncation (`domain_margin`) is a second convergence axis**
 
-`domain_margin` (parallel-plate default: 15 mm) defines the distance from the plates to the outer boundary of the finite computational domain. Because the physical exterior is effectively open, this artificial boundary can influence the computed fringing field and therefore quantities such as capacitance.
+`domain_margin` (parallel-plate default: 15 mm) is the distance from the plates to the outer boundary of the finite computational domain. The physical exterior is open; the artificial outer boundary (natural zero-normal-$\mathbf{D}$ condition) therefore truncates fringing and slightly under-reports stored energy and $C$.
 
-The mesh-convergence study in §8.2 varies mesh spacing $h$ while keeping `domain_margin` fixed. It therefore tests **discretization convergence only**, not convergence with respect to the size of the computational domain.
+The mesh-convergence study in §8.2 varies only $h$ at fixed margin, so it measures **discretization** error, not domain-size error. A graded-mesh sweep at the production spacing $h = 0.1$ mm quantifies the second axis:
 
-A simple check with `domain_margin` increased from 15 mm to 30 mm produced a small increase in computed $C$, with progressively smaller changes for further increases. This indicates that the default domain is reasonably stable, but is not by itself a proof of domain convergence.
+| margin [mm] | nodes       | $C$ [pF/m]  | Δ vs 15 mm  |
+| ----------: | ----:       | ---------:  | ---------:  |
+|          10 |  71 904     |    100.744  |     −1.12%  |
+|      **15** | **101 904** | **101.881** |       **0** |
+|          20 | 136 904     |    102.519  |     +0.63%  |
+|          30 | 221 904     |    103.167  |     +1.26%  |
+|          50 | 451 904     |    103.635  |     +1.72%  |
 
-**Practical consequence:** the reported parallel-plate results are mesh-converged at the stated `domain_margin`, but not formally domain-converged. For absolute accuracy, `domain_margin` should be swept at a fixed, sufficiently fine $h$ in the same way that §8.2 sweeps $h$.
+$C$ rises monotonically with margin and is still climbing slowly at 50 mm; successive increments diminish but have not fully plateaued. The 15 mm row matches the graded production value reported in §9.1 / §9.3.
+
+**Practical consequence:** reported parallel-plate results are mesh-converged at the stated margin, not formally domain-converged. Absolute $C$ at the default 15 mm is systematically low by roughly 1–2% versus a very large domain. Comparative studies (sharp vs. rounded, plate-width changes, material swaps) remain reliable—the bias is largely common-mode. For a more absolute number, use $\ge 30$ mm or sweep `domain_margin` at fixed fine $h$ the same way §8.2 sweeps $h$.
+
+```python
+"""Domain-margin sweep at production h (graded mesh)."""
+import capacitor_fem_universal as cfu
+
+cfu.SHOW_PLOTS = False
+cfu.SAVE_FIGURES = False
+
+h = 0.1e-3
+margins_mm = [10, 15, 20, 30, 50]
+print(f"{'margin [mm]':>12s} {'nodes':>8s} {'C [pF/m]':>12s} {'Δ vs 15mm':>10s}")
+C15 = None
+for m in margins_mm:
+    cfg = cfu.ParallelPlateConfig(
+        domain_margin=m * 1e-3, mesh_spacing=h, convergence_spacings=(h,)
+    )
+    r = cfu._solve_parallel_plate(cfg, h, use_graded=True)
+    if m == 15:
+        C15 = r["C"]
+    d = 100 * (r["C"] - C15) / C15 if C15 else float("nan")
+    print(f"{m:12.1f} {r['mesh'].n_nodes:8d} {r['C']*1e12:12.4f} {d:+9.2f}%")
+```
 
 ## 11. Future Work
 
