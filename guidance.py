@@ -40,9 +40,6 @@ from capacitor_fem_universal import (
     ElectrostaticProblem,
     Mesh,
     Rectangle,
-    RoundedRectangle,
-    Circle,
-    OutsideCircle,
     Difference,
     compare_parallel_plate_runs,
 )
@@ -65,9 +62,10 @@ def demo_quick_parallel_plate(show_ui: bool = False,
     save_png : bool
         If True, write PNG figures to the current directory / OUTPUT_DIR.
     use_graded : bool
-        The built-in example already runs a graded mesh when
-        RUN_GRADED_COMPARISON is True.  This flag is kept for documentation;
-        the example itself decides based on the module-level switch.
+        Forwarded to the module-level RUN_GRADED_COMPARISON switch, which
+        example_parallel_plate() checks to decide whether to also run and
+        report a graded-mesh solve alongside the uniform-mesh convergence
+        sweep.
     """
     print("\n=== 1. Quick Parallel-Plate Run ===")
     print(f"  SHOW_PLOTS   = {show_ui}")
@@ -76,6 +74,7 @@ def demo_quick_parallel_plate(show_ui: bool = False,
     # Toggle global switches on the imported module
     cfu.SHOW_PLOTS = show_ui
     cfu.SAVE_FIGURES = save_png
+    cfu.RUN_GRADED_COMPARISON = use_graded
 
     # Optional: silence the long convergence notes
     cfu.VERBOSE_CONVERGENCE_NOTES = False
@@ -237,7 +236,10 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     cfu.SHOW_PLOTS = show_ui
     cfu.SAVE_FIGURES = save_png
 
-    # --- geometry parameters (mirrors the parallel-plate defaults) ----------
+    # --- geometry parameters -------------------------------------------------
+    # plate_w / plate_t / gap mirror ParallelPlateConfig's defaults; margin is
+    # tighter than ParallelPlateConfig's default (15 mm) to keep this demo's
+    # mesh smaller and faster.
     plate_w = 24e-3
     plate_t = 1e-3
     gap     = 4e-3
@@ -291,16 +293,17 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     C = problem.capacitance(v_hi=100.0, v_lo=0.0)
     print(f"  Capacitance = {C * 1e12:.4f} pF/m")
 
-    # Optional plot (uses the same four-panel style as the built-in examples)
-    out_name = "custom_split_plate.png"
+    # Optional plot (uses the same four-panel style as the built-in examples).
+    # Routed through OUTPUT_DIR, same as every other figure in the module —
+    # problem.plot() already prints its own "Figure saved" line when
+    # SAVE_FIGURES is True, so there's nothing left to print here.
+    out_name = os.path.join(cfu.OUTPUT_DIR, "custom_split_plate.png")
     problem.plot(
         title=f"Split top-plate capacitor (slit = {slit_width*1e3:.1f} mm)",
         fname=out_name,
         xlim=(x0 + margin * 0.3, x0 + Lx - margin * 0.3),
         ylim=(y0 + margin * 0.3, y0 + Ly - margin * 0.3),
     )
-    if save_png:
-        print(f"  Figure saved: {out_name}")
 
 
 # =============================================================================
