@@ -36,7 +36,6 @@ import capacitor_fem_universal as cfu
 # ---------------------------------------------------------------------------
 from capacitor_fem_universal import (
     ParallelPlateConfig,
-    CoaxConfig,
     ElectrostaticProblem,
     Mesh,
     Rectangle,
@@ -307,30 +306,6 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
 
 
 # =============================================================================
-# 6. Bonus – quick coax run with a material change
-# =============================================================================
-def demo_coax_material_swap():
-    """
-    Show that the same pattern works for the coaxial example:
-    keep geometry, change only the dielectric.
-    """
-    print("\n=== 6. Bonus: Coax with different dielectric ===")
-
-    cfu.SHOW_PLOTS = False
-    cfu.SAVE_FIGURES = True
-
-    # Air-filled coax (εr = 1) instead of the default polyethylene (εr = 2.3)
-    air_cfg = CoaxConfig(dielectric_eps_r=1.0)
-
-    print("  Running example_coax with εr = 1.0 (air) …")
-    C, C_ideal, _ = cfu.example_coax(air_cfg)
-
-    print(f"  FEM        = {C * 1e12:.3f} pF/m")
-    print(f"  Analytical = {C_ideal * 1e12:.3f} pF/m")
-    print(f"  Error      = {100 * (C - C_ideal) / C_ideal:+.2f} %")
-
-
-# =============================================================================
 # Main – run the whole guidance suite
 # =============================================================================
 if __name__ == "__main__":
@@ -351,9 +326,6 @@ if __name__ == "__main__":
 
     # 5. Custom geometry that is not part of the original examples
     demo_custom_split_plate(slit_width=8e-3, show_ui=False, save_png=True)
-
-    # 6. Bonus coax material swap
-    demo_coax_material_swap()
 
     print("\n" + "=" * 60)
     print("All guidance demos finished.")
