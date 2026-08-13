@@ -79,15 +79,7 @@ Full discussion of each item, measured accuracy, and remaining limitations appea
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
     - [7.4 Rounded Plate Edges](#74-rounded-plate-edges)
     - [7.5 Comparing Two Runs on a Shared Color Scale](#75-comparing-two-runs-on-a-shared-color-scale)
-  - [8. Validation and Verification](#8-validation-and-verification)
-    - [8.1 Exact Analytical Check](#81-exact-analytical-check)
-    - [8.2 Mesh Convergence](#82-mesh-convergence)
-    - [8.3 Material Quadrature: A Negative Result](#83-material-quadrature-a-negative-result)
-    - [8.4 Rounded-Edge Geometry: Verification](#84-rounded-edge-geometry-verification)
-  - [9. Worked Examples](#9-worked-examples)
-    - [9.1 Parallel-Plate Capacitor with a Partial Dielectric Slab](#91-parallel-plate-capacitor-with-a-partial-dielectric-slab)
-    - [9.2 Coaxial Cable](#92-coaxial-cable)
-    - [9.3 Rounded Plate Edges: Sharp vs. Rounded](#93-rounded-plate-edges-sharp-vs-rounded)
+    - [7.6 External driver \& usage patterns (`guidance.py`)](#76-external-driver--usage-patterns-guidancepy)
   - [10. Known Limitations](#10-known-limitations)
   - [11. Future Work](#11-future-work)
     - [11.1 Dependency-free path (preferred)](#111-dependency-free-path-preferred)
@@ -739,6 +731,25 @@ which config fields actually differ, and saves two PNGs —
 from its *own* geometry, so it stays correct even when the varied parameter
 changes the bounding box, e.g. a plate-width comparison. See §8.4 for what's
 been verified about this function and §9.3 for a worked example.
+
+### 7.6 External driver & usage patterns (`guidance.py`)
+
+`guidance.py` is a self-contained companion script that treats
+`capacitor_fem_universal.py` as a frozen solver. It demonstrates, without
+modifying the core file:
+
+- runtime toggles (`SHOW_PLOTS`, `SAVE_FIGURES`),
+- single-parameter overrides and shared-scale comparisons via
+  `compare_parallel_plate_runs`,
+- dual independent configurations,
+- a two-axis sweep (`mesh_spacing` × `domain_margin`),
+- custom CSG geometry driven through the high-level
+  `ElectrostaticProblem` API.
+
+Run the whole suite with:
+
+```bash
+python3 guidance.py
 
 ## 8. Validation and Verification
 
