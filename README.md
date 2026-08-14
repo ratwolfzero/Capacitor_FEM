@@ -97,7 +97,7 @@ Full discussion of each item, measured accuracy, and remaining limitations appea
       - [Lower priority / more invasive](#lower-priority--more-invasive)
       - [Accuracy-neutral (memory / runtime)](#accuracy-neutral-memory--runtime)
     - [11.2 Beyond structured mesh (optional – introduces dependencies)](#112-beyond-structured-mesh-optional--introduces-dependencies)
-    - [11.3 Longer-term](#113-longer-term)
+    - [11.3 Architectural Out-of-Scope / Long-term Research](#113-architectural-out-of-scope--long-term-research)
 
 ## 1. Overview
 
@@ -1280,8 +1280,16 @@ Listed for completeness only; not the primary development direction.
   **Complexity: Low–Medium** (plus native dependency)  
   Pure performance/memory improvement; no accuracy change.
 
-### 11.3 Longer-term
+### 11.3 Architectural Out-of-Scope / Long-term Research
 
-- Quadratic (P2) elements — limited value on a pure staircase mesh.
-- 3-D tetrahedral elements.
-- Full adaptive refinement with a posteriori error estimators.
+These items represent fundamental paradigm shifts. They are separated from §11.1 and §11.2 because they either violate the current 2D geometric scope or offer diminishing returns under the structural constraints.
+
+- Quadratic (P2) elements
+  - Complexity: High (Dependency-free via pure NumPy)
+  - Rationale: Limited value on a pure staircase or structured mesh. Without exact curved boundary representations, the geometric error dominates, and the theoretical $O(h^2)$ convergence rate of P2 elements cannot be fully realized.
+- 3-D tetrahedral elements
+  - Complexity: Very High (Dependency-free via pure NumPy)
+  - Rationale: Requires a complete rewrite of the mesh generation, indexing, and visualization pipeline. While mathematically supported by the CSR sparse assembly logic, it moves beyond the intended scope of a lightweight 2D educational solver.
+- Full adaptive mesh refinement (AMR) with a posteriori error estimators
+  - Complexity: Extreme (Violates dependency-free constraint)
+  - Rationale: Implementing a robust, dynamic mesh-refinement tree (like longest-edge bisection) without external libraries inside a single file is practically unfeasible. This belongs strictly to established external FEM frameworks.
