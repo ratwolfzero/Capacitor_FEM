@@ -21,6 +21,15 @@ Run the whole suite:
 Or call individual demo_* functions from a notebook / interactive session.
 """
 
+# ---------------------------------------------------------------------------
+# Standard-library helpers used by *this* driver script itself
+# (not by the solver).  Needed regardless of which import style you pick
+# below: the demos call replace(...) and os.path.join(...) by these
+# top-level names.  The solver also imports both, so under Pattern 1 you
+# could write cfu.replace / cfu.os instead, but the ordinary names are
+# clearer.
+# ---------------------------------------------------------------------------
+
 from dataclasses import replace
 import os
 
