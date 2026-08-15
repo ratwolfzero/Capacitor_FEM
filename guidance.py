@@ -245,7 +245,7 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     cfu.SAVE_FIGURES = save_png
 
     # --- geometry parameters -------------------------------------------------
-    # plate_w / plate_t / gap mirror ParallelPlateConfig's defaults; 
+    # plate_w / plate_t / gap /margin mirror ParallelPlateConfig's defaults; 
     plate_w = 24e-3
     plate_t = 1e-3
     gap     = 4e-3
