@@ -225,7 +225,7 @@ def demo_two_axis_convergence_sweep():
 # 5. Custom geometry – symmetrical slit in the top plate
 # =============================================================================
 def demo_custom_split_plate(slit_width: float = 8e-3,
-                            h: float = 0.12e-3,
+                            h: float = 0.1e-3,
                             show_ui: bool = False,
                             save_png: bool = True):
     """
@@ -245,13 +245,11 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     cfu.SAVE_FIGURES = save_png
 
     # --- geometry parameters -------------------------------------------------
-    # plate_w / plate_t / gap mirror ParallelPlateConfig's defaults; margin is
-    # tighter than ParallelPlateConfig's default (15 mm) to keep this demo's
-    # mesh smaller and faster.
+    # plate_w / plate_t / gap mirror ParallelPlateConfig's defaults; 
     plate_w = 24e-3
     plate_t = 1e-3
     gap     = 4e-3
-    margin  = 12e-3
+    margin  = 15e-3
 
     Lx = plate_w + 2 * margin
     Ly = 2 * plate_t + gap + 2 * margin
