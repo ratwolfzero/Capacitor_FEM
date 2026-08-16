@@ -1,5 +1,5 @@
 """
-cfu_guidance.py — Practical driver & usage guide for capacitor_fem_universal.py
+cfu_driver.py — Practical driver & usage guide for capacitor_fem_universal.py
 
 Treat capacitor_fem_universal.py as a *frozen* solver template.
 This file shows how to drive it from the outside without modifying the solver.
@@ -16,7 +16,7 @@ What you will see here
    (symmetrical slit in the top plate).
 
 Run the whole suite:
-    python cfu_guidance.py
+    python cfu_driver.py
 
 Or call individual demo_* functions from a notebook / interactive session.
 """

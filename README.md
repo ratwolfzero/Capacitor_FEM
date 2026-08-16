@@ -79,7 +79,7 @@ Full discussion of each item, measured accuracy, and remaining limitations appea
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
     - [7.4 Rounded Plate Edges](#74-rounded-plate-edges)
     - [7.5 Comparing Two Runs on a Shared Color Scale](#75-comparing-two-runs-on-a-shared-color-scale)
-    - [7.6 External driver \& usage patterns (`cfu_guidance.py`)](#76-external-driver--usage-patterns-cfu_guidancepy)
+    - [7.6 External driver \& usage patterns (`cfu_driver.py`)](#76-external-driver--usage-patterns-cfu_driverpy)
   - [8. Validation and Verification](#8-validation-and-verification)
     - [8.1 Exact Analytical Check](#81-exact-analytical-check)
     - [8.2 Mesh Convergence](#82-mesh-convergence)
@@ -741,9 +741,9 @@ from its *own* geometry, so it stays correct even when the varied parameter
 changes the bounding box, e.g. a plate-width comparison. See §8.4 for what's
 been verified about this function and §9.3 for a worked example.
 
-### 7.6 External driver & usage patterns (`cfu_guidance.py`)
+### 7.6 External driver & usage patterns (`cfu_driver.py`)
 
-`cfu_guidance.py` is a self-contained companion script that treats
+`cfu_driver.py` is a self-contained companion script that treats
 `capacitor_fem_universal.py` as a frozen solver. It demonstrates, without
 modifying the core file:
 
@@ -758,7 +758,7 @@ modifying the core file:
 Run the whole suite with:
 
 ```bash
-python3 cfu_guidance.py
+python3 cfu_driver.py
 ```
 
 ## 8. Validation and Verification
