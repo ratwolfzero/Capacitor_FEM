@@ -16,7 +16,7 @@ What you will see here
    (symmetrical slit in the top plate).
 
 Run the whole suite:
-    python cfu_guidance.py
+    python3 cfu_guidance.py
 
 Or call individual demo_* functions from a notebook / interactive session.
 """
