@@ -335,10 +335,10 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
 
 
 # =============================================================================
-# Main – run the whole guidance suite
+# Main – run the whole driver suite
 # =============================================================================
 if __name__ == "__main__":
-    print("capacitor_fem_universal – guidance suite")
+    print("capacitor_fem_universal – driver suite")
     print("=" * 60)
 
     # 1. Fast demo of the built-in parallel-plate path
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     )
 
     print("\n" + "=" * 60)
-    print("All guidance demos finished.")
+    print("All driver demos finished.")
     print("Inspect the generated PNG files and the console tables above.")
     print("You can now copy any demo_* function into your own script")
     print("and adapt the parameters to your geometry.")
