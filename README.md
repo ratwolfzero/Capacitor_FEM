@@ -743,7 +743,7 @@ been verified about this function and §9.3 for a worked example.
 
 ### 7.6 External driver & usage patterns (`cfu_guidance.py`)
 
-`guidance.py` is a self-contained companion script that treats
+`cfu_guidance.py` is a self-contained companion script that treats
 `capacitor_fem_universal.py` as a frozen solver. It demonstrates, without
 modifying the core file:
 
@@ -992,7 +992,7 @@ run automatically by default (`RUN_GRADED_COMPARISON`, §5.1) — it gives
 **101.881 pF/m**, 0.04% from the uniform value above, and is exposed as
 `graded["C"]`, the fourth value `example_parallel_plate()` returns (§7.2).
 
-![Parallel-plate capacitor: dielectric map, equipotential contours, field lines, and energy density](example1_parallel_plate.png)
+![Parallel-plate capacitor: dielectric map, equipotential contours, field lines, and energy density](Images/example1_parallel_plate.png)
 
 ### 9.2 Coaxial Cable
 
@@ -1004,7 +1004,7 @@ $C' = 2\pi\varepsilon_0\varepsilon_r \big/ \ln(b/a)$. At production resolution
 analytical, a **−0.75%** difference, attributable entirely to the staircase
 approximation of the circular boundary (§8.2, §10.1).
 
-![Coaxial capacitor: dielectric map, equipotential contours, field lines, and energy density](example2_coax.png)
+![Coaxial capacitor: dielectric map, equipotential contours, field lines, and energy density](Images/example2_coax.png)
 
 ### 9.3 Rounded Plate Edges: Sharp vs. Rounded
 
@@ -1041,9 +1041,9 @@ further in relative terms, from **71758.5 V/m** to **59729.5 V/m** —
 expected, but not by itself a claim that either number is a converged,
 physically precise peak field; see §10.5.
 
-![Sharp plate edges, graded mesh, shared |E| scale with the rounded case below](compare_edges_sharp.png)
+![Sharp plate edges, graded mesh, shared |E| scale with the rounded case below](Images/compare_edges_sharp.png)
 
-![Rounded plate edges (r=0.5mm), same shared |E| scale as above](compare_edges_r=0.5mm.png)
+![Rounded plate edges (r=0.5mm), same shared |E| scale as above](Images/compare_edges_r=0.5mm.png)
 
 Both figures share one colorbar range, so the field-line and energy-density
 panels are directly comparable: the interior/bulk field (§8.4 item 6) is
@@ -1064,7 +1064,7 @@ boundaries are approximated by a staircase of grid cells with $O(h)$
 approximation error. Directly measured in §8.2's coax table: error shrinks
 steadily from −2.76% to −0.75% as $h$ goes from 0.3 mm to 0.075 mm.
 
-![Staircase approximation of a circle](staircase_boundary.png)
+![Staircase approximation of a circle](staircase_Images/staircase_boundary.png)
 *Figure: Staircasing of a circular boundary on a Cartesian mesh. The orange circle is the true geometry; the dark outline is what the solver actually sees.*
 
 **10.2 — Corner singularities are under-resolved by a uniform mesh.** The field
