@@ -638,9 +638,6 @@ The universal script includes:
   supported platform — see §7.4, §7.5, §8.4, §9.3, and §10.5 for the
   details, verification, worked example, and known limitations.
 
-Prefer it for new work; the desktop-only `capacitor_fem.py` is
-retained for reference and bit-compatible core numerics.
-
 ### 7.2 Quick Start
 
 ```python
