@@ -16,7 +16,7 @@ What you will see here
    (symmetrical slit in the top plate).
 
 Run the whole suite:
-    python cfu_driver.py
+    python3 cfu_driver.py
 
 Or call individual demo_* functions from a notebook / interactive session.
 """
