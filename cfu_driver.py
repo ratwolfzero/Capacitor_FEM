@@ -37,6 +37,41 @@ import capacitor_fem_universal as cfu
 
 
 # =============================================================================
+# Helper: shared geometric quantities derived from ParallelPlateConfig
+# =============================================================================
+def make_parallel_plate_domain(config: cfu.ParallelPlateConfig | None = None) -> dict:
+    """
+    Return the basic geometric quantities that both the built-in
+    parallel-plate path and custom CSG demos usually need.
+
+    Starting from a ParallelPlateConfig (or the shipped defaults) keeps
+    custom geometries in sync with the rest of the project when the
+    default plate dimensions change.
+    """
+    cfg = config or cfu.ParallelPlateConfig()
+
+    plate_w = max(cfg.bottom_plate_width, cfg.top_plate_width)
+    plate_t = cfg.plate_thickness
+    gap = cfg.gap
+    margin = cfg.domain_margin
+
+    Lx = plate_w + 2 * margin
+    Ly = 2 * plate_t + gap + 2 * margin
+
+    return {
+        "config": cfg,
+        "plate_w": plate_w,
+        "plate_t": plate_t,
+        "gap": gap,
+        "margin": margin,
+        "Lx": Lx,
+        "Ly": Ly,
+        "x0": -Lx / 2.0,
+        "y0": -Ly / 2.0,
+    }
+
+
+# =============================================================================
 # 1. Quick parallel-plate run with runtime toggles
 # =============================================================================
 def demo_quick_parallel_plate(show_ui: bool = False,
@@ -220,7 +255,8 @@ def demo_two_axis_convergence_sweep():
 def demo_custom_split_plate(slit_width: float = 8e-3,
                             h: float = 0.1e-3,
                             show_ui: bool = False,
-                            save_png: bool = True):
+                            save_png: bool = True,
+                            config: cfu.ParallelPlateConfig | None = None):
     """
     Build a *new* geometry that is not one of the built-in examples:
 
@@ -230,6 +266,10 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
 
     Uses the high-level ElectrostaticProblem façade so the solver pipeline
     stays completely untouched.
+
+    Geometric defaults are taken from ParallelPlateConfig (or a user-supplied
+    config) via make_parallel_plate_domain(), so the custom demo stays in
+    sync with the rest of the project.
     """
     print("\n=== 5. Custom Geometry: Split Top-Plate Capacitor ===")
     print(f"  slit width = {slit_width*1e3:.1f} mm, "
@@ -238,18 +278,16 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     cfu.SHOW_PLOTS = show_ui
     cfu.SAVE_FIGURES = save_png
 
-    # --- geometry parameters -------------------------------------------------
-    # plate_w / plate_t / gap / margin mirror ParallelPlateConfig's defaults.
-    plate_w = 24e-3
-    plate_t = 1e-3
-    gap = 4e-3
-    margin = 15e-3
-
-    Lx = plate_w + 2 * margin
-    Ly = 2 * plate_t + gap + 2 * margin
-
-    x0 = -Lx / 2.0
-    y0 = -Ly / 2.0
+    # --- geometry from shared helper ----------------------------------------
+    geo = make_parallel_plate_domain(config)
+    plate_w = geo["plate_w"]
+    plate_t = geo["plate_t"]
+    gap     = geo["gap"]
+    margin  = geo["margin"]
+    Lx      = geo["Lx"]
+    Ly      = geo["Ly"]
+    x0      = geo["x0"]
+    y0      = geo["y0"]
 
     # Cartesian mesh (uniform for simplicity)
     nx = int(round(Lx / h)) + 1
@@ -317,9 +355,6 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     print(f"  Capacitance = {C * 1e12:.4f} pF/m")
 
     # Optional plot (uses the same four-panel style as the built-in examples).
-    # Routed through OUTPUT_DIR, same as every other figure in the module —
-    # problem.plot() already prints its own "Figure saved" line when
-    # SAVE_FIGURES is True, so there's nothing left to print here.
     out_name = os.path.join(
         cfu.OUTPUT_DIR,
         "custom_split_plate.png",
@@ -362,6 +397,28 @@ if __name__ == "__main__":
         show_ui=False,
         save_png=True,
     )
+    
+    """
+    # 5b. Custom geometry – full config from scratch (example)
+    my_cfg = cfu.ParallelPlateConfig(
+        plate_thickness=1.5e-3,
+        gap=5e-3,
+        bottom_plate_width=28e-3,
+        top_plate_width=28e-3,
+        domain_margin=25e-3,
+        voltage=150.0,
+        dielectric_eps_r=4.5,
+        mesh_spacing=0.08e-3,
+    )
+
+    demo_custom_split_plate(
+        slit_width=6e-3,
+        h=0.08e-3,
+        config=my_cfg,
+        show_ui=False,
+        save_png=True,
+    )
+    """
 
     print("\n" + "=" * 60)
     print("All driver demos finished.")
