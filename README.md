@@ -8,7 +8,8 @@ Pure NumPy / SciPy / Matplotlib. No mesh-generation library, no compiled extensi
 python3 capacitor_fem_universal.py
 ```
 
-`capacitor_fem_universal.py` is the primary development version. All future work continues there. The original desktop-only `capacitor_fem.py` in the Desktop folder is retained for reference and remains bit-compatible in the core numerics.
+`capacitor_fem_universal.py` is the single, platform-independent implementation.
+All future work continues there.
 
 This document covers the physics, mathematics, numerical method, software architecture, and usage of the code. It assumes familiarity with vector calculus, linear algebra, and Python, but not necessarily with finite elements; the derivation starts from Maxwell's equations and builds up from there.
 
@@ -73,8 +74,7 @@ Full discussion of each item, measured accuracy, and remaining limitations appea
   - [7. Usage](#7-usage)
     - [7.1 Running the Examples](#71-running-the-examples)
     - [7.1.1 Jupyter](#711-jupyter)
-    - [7.1.2 Android / Pydroid in the Android Folder](#712-android--pydroid-in-the-android-folder)
-    - [7.1.3 Further development](#713-further-development)
+    - [7.1.2 Android / Pydroid](#712-android--pydroid)
     - [7.2 Quick Start](#72-quick-start)
     - [7.3 Extending: A New Geometry](#73-extending-a-new-geometry)
     - [7.4 Rounded Plate Edges](#74-rounded-plate-edges)
@@ -619,24 +619,12 @@ green traffic-light button, exit with **Ctrl+F**.
 Jupyter / Carnets (iOS) note
 The script runs without changes in Jupyter notebooks and in Carnets on iPad. Plot windows appear as static images (the interactive desktop behaviour is not available). When SAVE_FIGURES = True the PNG files are still written and can be viewed or displayed normally.
 
-### 7.1.2 Android / Pydroid in the Android Folder
+### 7.1.2 Android / Pydroid
 
-It contains robustness improvements for Pydroid 3 on Android, but the same script runs unchanged on desktop, Jupyter / Carnets(with static plots), and Pydroid 3 for Android
-
-### 7.1.3 Further development
-
-Further development is carried out on `capacitor_fem_universal.py` in the main directory.  
-
-The universal script includes:
-
-- Save-only plotting on Android / Pydroid (no blocking `plt.show()`),
-  while still writing PNGs when `SAVE_FIGURES = True`.
-- Detection of the Android / Pydroid environment so desktop and notebook
-  behaviour remains interactive where a GUI is available.
-- Optional rounded plate edges (`edge_radius`) and a general run-comparison
-  tool (`compare_parallel_plate_runs`), both fully usable on every
-  supported platform — see §7.4, §7.5, §8.4, §9.3, and §10.5 for the
-  details, verification, worked example, and known limitations.
+The same `capacitor_fem_universal.py` runs on Pydroid 3 (Android).  
+It auto-detects the environment and switches to save-only plotting
+(no blocking `plt.show()`), while still writing PNGs when `SAVE_FIGURES = True`.
+No separate Android script is required.
 
 ### 7.2 Quick Start
 
