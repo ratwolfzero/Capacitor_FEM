@@ -283,12 +283,12 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
     geo = make_parallel_plate_domain(config)
     plate_w = geo["plate_w"]
     plate_t = geo["plate_t"]
-    gap     = geo["gap"]
-    margin  = geo["margin"]
-    Lx      = geo["Lx"]
-    Ly      = geo["Ly"]
-    x0      = geo["x0"]
-    y0      = geo["y0"]
+    gap = geo["gap"]
+    margin = geo["margin"]
+    Lx = geo["Lx"]
+    Ly = geo["Ly"]
+    x0 = geo["x0"]
+    y0 = geo["y0"]
 
     # Cartesian mesh (uniform for simplicity)
     nx = int(round(Lx / h)) + 1
@@ -363,7 +363,7 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
 
     problem.plot(
         title=f"Split top-plate capacitor "
-              f"(slit = {slit_width*1e3:.1f} mm)",
+        f"(slit = {slit_width*1e3:.1f} mm)",
         fname=out_name,
         xlim=(x0 + margin * 0.3, x0 + Lx - margin * 0.3),
         ylim=(y0 + margin * 0.3, y0 + Ly - margin * 0.3),
@@ -420,12 +420,12 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
 
     plate_w = geo["plate_w"]
     plate_t = geo["plate_t"]
-    gap     = geo["gap"]
-    margin  = geo["margin"]
-    Lx      = geo["Lx"]
-    Ly      = geo["Ly"]
-    x0      = geo["x0"]
-    y0      = geo["y0"]
+    gap = geo["gap"]
+    margin = geo["margin"]
+    Lx = geo["Lx"]
+    Ly = geo["Ly"]
+    x0 = geo["x0"]
+    y0 = geo["y0"]
 
     # Dielectric slab occupies the lower half of the gap (default 2 mm of 4 mm)
     dielectric_t = cfg.dielectric_thickness
@@ -449,7 +449,8 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
             "Reduce radius or move the centre.")
 
     print(f"  glass slab y ∈ [{y_slab_lo*1e3:.2f}, {y_slab_hi*1e3:.2f}] mm")
-    print(f"  bubble centre = ({bubble_center_x*1e3:.2f}, {bubble_center_y*1e3:.2f}) mm")
+    print(
+        f"  bubble centre = ({bubble_center_x*1e3:.2f}, {bubble_center_y*1e3:.2f}) mm")
 
     # Cartesian mesh (uniform for simplicity; graded is also possible)
     nx = int(round(Lx / h)) + 1
@@ -592,7 +593,7 @@ if __name__ == "__main__":
         save_png=True,
     )
     """
-    
+
     # 6. Default parallel-plate geometry with a small air bubble in the glass
     demo_air_bubble_in_glass(
         bubble_radius=0.6e-3,          # 0.6 mm radius – comfortably inside 2 mm slab
