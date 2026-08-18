@@ -27,6 +27,7 @@ Or call individual demo_* functions from a notebook / interactive session.
 # ---------------------------------------------------------------------------
 from dataclasses import replace
 import os
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Import the solver as a module.
@@ -523,6 +524,33 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
 
     C = problem.capacitance(v_hi=cfg.voltage, v_lo=0.0)
     print(f"  Capacitance (with bubble) = {C * 1e12:.4f} pF/m")
+
+    # --- Field-strength summary in the three regions ----------------------------
+    centroids = problem.mesh.centroids()          # (n_tris, 2)
+    cx, cy = centroids[:, 0], centroids[:, 1]
+    Emag = problem.Emag                           # |E| per triangle [V/m]
+
+    # Region masks (same geometry definitions used above)
+    air_layer = cfu.Rectangle(x0=-plate_w/2.0, y0=y_slab_hi, width=plate_w,
+                              height=y_gap_hi - y_slab_hi, name="air_layer")
+    in_air_gap = air_layer.contains(cx, cy)
+    in_glass = glass_slab.contains(cx, cy) & ~air_bubble.contains(cx, cy)
+    in_bubble = air_bubble.contains(cx, cy)
+
+    def _stats(mask, name):
+        if not np.any(mask):
+            print(f"  |E| {name:12s}:  (no triangles)")
+            return
+        vals = Emag[mask]
+        print(f"  |E| {name:12s}:  mean = {vals.mean():8.1f} V/m   "
+              f"median = {np.median(vals):8.1f} V/m   "
+              f"max = {vals.max():8.1f} V/m   "
+              f"({mask.sum()} tris)")
+
+    print()
+    _stats(in_air_gap, "air layer")
+    _stats(in_glass,   "glass slab")
+    _stats(in_bubble,  "air bubble")
 
     # Reference: same geometry without the bubble (quick analytical-style estimate
     # is not trivial because of fringing; we just report the FEM value).
