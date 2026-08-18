@@ -373,6 +373,7 @@ def demo_custom_split_plate(slit_width: float = 8e-3,
 
 # =============================================================================
 # 6. Default parallel-plate + small air bubble inside the glass slab
+#     (now with graded Cartesian mesh)
 # =============================================================================
 def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
                              bubble_center_x: float = 0.0,
@@ -387,10 +388,13 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
 
         a small circular air bubble (ε_r = 1) punched out of the glass slab.
 
-    The bubble is realised by CSG difference (or, equivalently, by adding
-    an overriding dielectric region with ε_r = 1 after the glass slab).
-    Everything else — plates, voltages, gap, slab thickness, background
-    air — stays identical to ParallelPlateConfig defaults.
+    Uses the same graded Cartesian mesh as the official parallel-plate
+    example (edge bands refined, gap refined, margins coarsened).
+
+    The bubble is realised by adding an overriding dielectric region
+    (ε_r = 1) after the glass slab. Everything else — plates, voltages,
+    gap, slab thickness, background air — stays identical to
+    ParallelPlateConfig defaults.
 
     Parameters
     ----------
@@ -401,46 +405,59 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
         Horizontal offset of the bubble centre relative to the plate
         mid-plane [m].  Default 0 (centred).
     bubble_center_y : float or None
-        Vertical coordinate of the bubble centre [m].  When None the
-        bubble is placed at the mid-height of the glass slab.
+        Absolute y-coordinate of the bubble centre [m] in the solver’s
+        bottom-left origin.  When None the bubble is placed at the
+        mid-height of the glass slab.
     h : float
-        Mesh spacing [m].
+        Nominal mesh spacing [m] (same meaning as ParallelPlateConfig.mesh_spacing).
     show_ui, save_png : bool
         Plotting / file-output toggles.
     config : ParallelPlateConfig or None
         Optional base configuration; defaults to the shipped ParallelPlateConfig.
     """
-    print("\n=== 6. Default Parallel-Plate + Air Bubble in Glass Slab ===")
-    print(f"  bubble radius = {bubble_radius*1e3:.2f} mm, h = {h*1e3:.2f} mm")
+    print("\n=== 6. Default Parallel-Plate + Air Bubble in Glass Slab (graded mesh) ===")
+    print(
+        f"  bubble radius = {bubble_radius*1e3:.2f} mm, nominal h = {h*1e3:.2f} mm")
 
     cfu.SHOW_PLOTS = show_ui
     cfu.SAVE_FIGURES = save_png
 
     cfg = config or cfu.ParallelPlateConfig()
-    geo = make_parallel_plate_domain(cfg)
 
-    plate_w = geo["plate_w"]
-    plate_t = geo["plate_t"]
-    gap = geo["gap"]
-    margin = geo["margin"]
-    Lx = geo["Lx"]
-    Ly = geo["Ly"]
-    x0 = geo["x0"]
-    y0 = geo["y0"]
+    # ------------------------------------------------------------------
+    # 1. Official geometry + graded mesh (bottom-left origin)
+    # ------------------------------------------------------------------
+    conductors, _eps_r_unused, dims = cfu._build_parallel_plate_geometry(
+        cfg, h)
+    mesh = cfu._build_graded_parallel_plate_mesh(h, dims)
 
-    # Dielectric slab occupies the lower half of the gap (default 2 mm of 4 mm)
-    dielectric_t = cfg.dielectric_thickness
-    # y-coordinates of the gap (plates sit outside the gap)
-    y_gap_lo = -gap / 2.0
-    y_gap_hi = +gap / 2.0
+    print(f"  graded mesh: {mesh.n_nodes} nodes, {mesh.n_tris} triangles")
+
+    # Convenience aliases from the official dims dict
+    plate_w = dims["plate_w_max"]
+    plate_t = dims["plate_t"]
+    gap = dims["gap"]
+    margin = dims["margin"]
+    Lx = dims["Lx"]
+    Ly = dims["Ly"]
+    x_plate0 = dims["x_plate0"]          # == margin
+    y_gap_lo = dims["y_gap_lo"]
+    y_gap_hi = dims["y_gap_hi"]
+    dielectric_t = dims["dielectric_t"]
+
     y_slab_lo = y_gap_lo
     y_slab_hi = y_gap_lo + dielectric_t
 
-    # Default bubble placement: centre of the glass slab, horizontally centred
+    # ------------------------------------------------------------------
+    # 2. Bubble placement (respect user offsets, stay inside slab)
+    # ------------------------------------------------------------------
+    # Horizontal centre of the plates in the bottom-left coordinate system
+    plate_mid_x = x_plate0 + 0.5 * plate_w
+    bubble_cx = plate_mid_x + bubble_center_x
+
     if bubble_center_y is None:
         bubble_center_y = 0.5 * (y_slab_lo + y_slab_hi)
 
-    # Sanity: bubble must fit inside the slab
     if (bubble_center_y - bubble_radius < y_slab_lo - 1e-9 or
             bubble_center_y + bubble_radius > y_slab_hi + 1e-9):
         raise ValueError(
@@ -450,42 +467,14 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
             "Reduce radius or move the centre.")
 
     print(f"  glass slab y ∈ [{y_slab_lo*1e3:.2f}, {y_slab_hi*1e3:.2f}] mm")
-    print(
-        f"  bubble centre = ({bubble_center_x*1e3:.2f}, {bubble_center_y*1e3:.2f}) mm")
+    print(f"  bubble centre = ({bubble_cx*1e3:.2f}, {bubble_center_y*1e3:.2f}) mm "
+          f"(offset from plate mid-plane = {bubble_center_x*1e3:.2f} mm)")
 
-    # Cartesian mesh (uniform for simplicity; graded is also possible)
-    nx = int(round(Lx / h)) + 1
-    ny = int(round(Ly / h)) + 1
-
-    mesh = cfu.Mesh(
-        x0=x0,
-        y0=y0,
-        Lx=Lx,
-        Ly=Ly,
-        nx=nx,
-        ny=ny,
-    )
-
-    # ---- conductors (identical to default parallel-plate) --------------------
-    bot = cfu.Rectangle(
-        x0=-plate_w / 2.0,
-        y0=-gap / 2.0 - plate_t,
-        width=plate_w,
-        height=plate_t,
-        name="bottom_plate",
-    )
-    top = cfu.Rectangle(
-        x0=-plate_w / 2.0,
-        y0=+gap / 2.0,
-        width=plate_w,
-        height=plate_t,
-        name="top_plate",
-    )
-
-    # ---- dielectrics -------------------------------------------------------
-    # 1. Full glass slab (ε_r = dielectric_eps_r)
+    # ------------------------------------------------------------------
+    # 3. Dielectrics (glass first, then air bubble that overrides it)
+    # ------------------------------------------------------------------
     glass_slab = cfu.Rectangle(
-        x0=-plate_w / 2.0,
+        x0=x_plate0,
         y0=y_slab_lo,
         width=plate_w,
         height=dielectric_t,
@@ -493,46 +482,46 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
         name="glass_slab",
     )
 
-    # 2. Air bubble – a circle that overrides the glass with ε_r = 1
-    #    (later regions win in make_eps_r_function)
     air_bubble = cfu.Circle(
-        center=(bubble_center_x, bubble_center_y),
+        center=(bubble_cx, bubble_center_y),
         radius=bubble_radius,
-        eps_r=1.0,                     # air
+        eps_r=1.0,
         name="air_bubble",
     )
 
-    # Optional: you can also write the glass as a Difference
-    #     glass_with_hole = glass_slab - air_bubble
-    # and then add only that one dielectric.  The override approach above
-    # is simpler and produces identical ε_r maps.
-
-    # ---- high-level problem ------------------------------------------------
+    # ------------------------------------------------------------------
+    # 4. High-level problem
+    # ------------------------------------------------------------------
     problem = cfu.ElectrostaticProblem(
         mesh,
         background_eps_r=cfg.background_eps_r,
     )
 
-    problem.add_conductor(bot, voltage=0.0)
-    problem.add_conductor(top, voltage=cfg.voltage)
+    # Conductors already carry the correct voltages from the official builder
+    for cond in conductors:
+        problem.add_conductor(cond, voltage=cond.voltage)
 
-    problem.add_dielectric(glass_slab)          # glass first
-    problem.add_dielectric(air_bubble)          # air bubble overrides
+    problem.add_dielectric(glass_slab)   # glass first
+    problem.add_dielectric(air_bubble)   # air bubble overrides
 
     print("  Solving …")
     problem.solve()
 
     C = problem.capacitance(v_hi=cfg.voltage, v_lo=0.0)
-    print(f"  Capacitance (with bubble) = {C * 1e12:.4f} pF/m")
+    print(f"  Capacitance (with bubble, graded mesh) = {C * 1e12:.4f} pF/m")
 
-    # --- Field-strength summary in the three regions ----------------------------
+    # ------------------------------------------------------------------
+    # 5. Field-strength summary in the three regions
+    # ------------------------------------------------------------------
     centroids = problem.mesh.centroids()          # (n_tris, 2)
     cx, cy = centroids[:, 0], centroids[:, 1]
     Emag = problem.Emag                           # |E| per triangle [V/m]
 
-    # Region masks (same geometry definitions used above)
-    air_layer = cfu.Rectangle(x0=-plate_w/2.0, y0=y_slab_hi, width=plate_w,
-                              height=y_gap_hi - y_slab_hi, name="air_layer")
+    air_layer = cfu.Rectangle(
+        x0=x_plate0, y0=y_slab_hi,
+        width=plate_w, height=y_gap_hi - y_slab_hi,
+        name="air_layer",
+    )
     in_air_gap = air_layer.contains(cx, cy)
     in_glass = glass_slab.contains(cx, cy) & ~air_bubble.contains(cx, cy)
     in_bubble = air_bubble.contains(cx, cy)
@@ -552,19 +541,19 @@ def demo_air_bubble_in_glass(bubble_radius: float = 0.6e-3,
     _stats(in_glass,   "glass slab")
     _stats(in_bubble,  "air bubble")
 
-    # Reference: same geometry without the bubble (quick analytical-style estimate
-    # is not trivial because of fringing; we just report the FEM value).
-    # For a pure comparison one could also call example_parallel_plate() and
-    # look at the graded/uniform result.
-
+    # ------------------------------------------------------------------
+    # 6. Plot (same framing style as the official graded example)
+    # ------------------------------------------------------------------
     out_name = os.path.join(cfu.OUTPUT_DIR, "custom_air_bubble_in_glass.png")
 
     problem.plot(
         title=(f"Parallel-plate + air bubble in glass "
-               f"(r = {bubble_radius*1e3:.2f} mm)"),
+               f"(r = {bubble_radius*1e3:.2f} mm) — graded mesh"),
         fname=out_name,
-        xlim=(x0 + margin * 0.3, x0 + Lx - margin * 0.3),
-        ylim=(y0 + margin * 0.3, y0 + Ly - margin * 0.3),
+        xlim=(x_plate0 - cfg.plot_margin,
+              x_plate0 + plate_w + cfg.plot_margin),
+        ylim=(margin - cfg.plot_margin,
+              margin + cfg.plot_margin + 2 * plate_t + gap),
     )
 
     print(f"  → figure: {out_name}")
