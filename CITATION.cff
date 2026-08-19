@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Capacitor_FEM"
+authors:
+  - family-names: "Becker"
+    given-names: "Ralf"
+    
+orcid: https://orcid.org/0009-0006-8163-9915
+doi: 10.5281/zenodo.21974301         
+license: MIT
+repository-code: "https://github.com/ratwolfzero/Capacitor_FEM"
