@@ -180,7 +180,7 @@ $$0 = \int_\Omega w\\,\nabla\cdot(\varepsilon\nabla V)\\,dA$$
 Using the product rule $\nabla\cdot(w\\,\varepsilon\nabla V) = w\\,\nabla\cdot(\varepsilon\nabla V) + \varepsilon\nabla w\cdot\nabla V$
 and the divergence theorem converts this to
 
-$$0 = \oint_{\partial\Omega} w\\,\varepsilon\\,\frac{\partial V}{\partial n}\\,ds \;-\; \int_\Omega \varepsilon\\,\nabla w\cdot\nabla V\\,dA$$
+$$0 = \oint_{\partial\Omega} w\\,\varepsilon\\,\frac{\partial V}{\partial n}\\,ds \\;-\\; \int_\Omega \varepsilon\\,\nabla w\cdot\nabla V\\,dA$$
 
 Restricting $w$ to functions that vanish on the Dirichlet (conductor) boundaries
 eliminates that part of the boundary integral. No flux condition is imposed on the
@@ -529,7 +529,7 @@ rectangle's center and $e_x = \text{width}/2-r$, $e_y = \text{height}/2-r$:
 
 $$q_x = |x-c_x|-e_x, \qquad q_y = |y-c_y|-e_y$$
 
-$$d = \sqrt{\max(q_x,0)^2+\max(q_y,0)^2} \;+\; \min(\max(q_x,q_y),\\,0) \;-\; r$$
+$$d = \sqrt{\max(q_x,0)^2+\max(q_y,0)^2} \\;+\\; \min(\max(q_x,q_y),\\,0) \\;-\\; r$$
 
 a point is inside iff $d \le$ `BOUNDARY_TOLERANCE_M`. Straight sides reduce to
 the ordinary rectangle test; near a corner it falls back to "distance to the
