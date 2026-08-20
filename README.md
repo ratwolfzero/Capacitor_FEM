@@ -258,7 +258,7 @@ detailed as an implementation matter in §4.4.
 Partition the nodes into **fixed** (Dirichlet, voltage known) and **free**
 (unknown) sets. The assembled system $KV=0$ block-partitions as
 
-$$\begin{pmatrix}K_{ff} & K_{fd}\\ K_{df} & K_{dd}\end{pmatrix}\begin{pmatrix}V_f\\ V_d\end{pmatrix} = \begin{pmatrix}0\\ \cdot\end{pmatrix}$$
+$$\begin{pmatrix}K_{ff} & K_{fd}\\\\ K_{df} & K_{dd}\end{pmatrix}\begin{pmatrix}V_f\\\\ V_d\end{pmatrix} = \begin{pmatrix}0\\\\ \cdot\end{pmatrix}$$
 
 Only the free-node block equations are meaningful constraints on the unknowns
 (the fixed-node rows aren't equations to solve, since $V_d$ is already known), so
