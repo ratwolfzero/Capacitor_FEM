@@ -107,9 +107,7 @@ Given a set of conductors at fixed voltages and a (possibly spatially varying)
 dielectric filling the space between them, the solver computes the electric
 potential $V(x,y)$ everywhere, and from it:
 
-$$
-\mathbf{E} = -\nabla V \qquad \mathbf{D} = \varepsilon\mathbf{E} \qquad W = \frac{1}{2}\int_\Omega \mathbf{E}\cdot\mathbf{D}\,dA \qquad C = \frac{2W}{(\Delta V)^2}
-$$
+$$\mathbf{E} = -\nabla V \qquad \mathbf{D} = \varepsilon\mathbf{E} \qquad W = \frac{1}{2}\int_\Omega \mathbf{E}\cdot\mathbf{D}\\,dA \qquad C = \frac{2W}{(\Delta V)^2}$$
 
 the electric field, displacement, stored energy, and two-conductor capacitance. The
 same solver handles a parallel-plate capacitor, a coaxial cable, or any geometry built
