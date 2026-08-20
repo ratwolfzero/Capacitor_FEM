@@ -107,7 +107,9 @@ Given a set of conductors at fixed voltages and a (possibly spatially varying)
 dielectric filling the space between them, the solver computes the electric
 potential $V(x,y)$ everywhere, and from it:
 
-$$\mathbf{E} = -\nabla V \qquad \mathbf{D} = \varepsilon\mathbf{E} \qquad W = \frac{1}{2}\int_\Omega \mathbf{E}\cdot\mathbf{D}\\,dA \qquad C = \frac{2W}{(\Delta V)^2}$$
+$$
+\mathbf{E} = -\nabla V \qquad \mathbf{D} = \varepsilon\mathbf{E} \qquad W = \frac{1}{2}\int_\Omega \mathbf{E}\cdot\mathbf{D}\\,dA \qquad C = \frac{2W}{(\Delta V)^2}
+$$
 
 the electric field, displacement, stored energy, and two-conductor capacitance. The
 same solver handles a parallel-plate capacitor, a coaxial cable, or any geometry built
@@ -142,7 +144,7 @@ $$\mathbf{E} = -\nabla V$$
 For a linear, isotropic, non-dispersive dielectric, $\mathbf{D}$ and $\mathbf{E}$
 are related by a scalar (position-dependent) permittivity:
 
-$$\mathbf{D} = \varepsilon\,\mathbf{E}, \qquad \varepsilon(x,y) = \varepsilon_0\,\varepsilon_r(x,y)$$
+$$\mathbf{D} = \varepsilon\\,\mathbf{E}, \qquad \varepsilon(x,y) = \varepsilon_0\\,\varepsilon_r(x,y)$$
 
 Inside a capacitor's dielectric there is no free charge — all of it resides on the
 conductor surfaces, which enter the problem as boundary conditions rather than a
@@ -153,7 +155,7 @@ $$\nabla\cdot\mathbf{D} = 0$$
 Substituting the previous two relations gives the equation the solver actually
 solves:
 
-$$\boxed{\ \nabla\cdot\big(\varepsilon\,\nabla V\big) = 0\ }$$
+$$\boxed{\ \nabla\cdot\big(\varepsilon\\,\nabla V\big) = 0\ }$$
 
 a generalized Poisson equation. When $\varepsilon$ is uniform this is the ordinary
 Laplace equation $\nabla^2 V = 0$; allowing $\varepsilon$ to vary in space is what
@@ -173,12 +175,12 @@ The finite element method solves the PDE in *weak* (integral) form rather than
 pointwise. Multiply the governing equation by an arbitrary test function $w$ and
 integrate over the domain $\Omega$:
 
-$$0 = \int_\Omega w\,\nabla\cdot(\varepsilon\nabla V)\,dA$$
+$$0 = \int_\Omega w\\,\nabla\cdot(\varepsilon\nabla V)\\,dA$$
 
-Using the product rule $\nabla\cdot(w\,\varepsilon\nabla V) = w\,\nabla\cdot(\varepsilon\nabla V) + \varepsilon\nabla w\cdot\nabla V$
+Using the product rule $\nabla\cdot(w\\,\varepsilon\nabla V) = w\\,\nabla\cdot(\varepsilon\nabla V) + \varepsilon\nabla w\cdot\nabla V$
 and the divergence theorem converts this to
 
-$$0 = \oint_{\partial\Omega} w\,\varepsilon\,\frac{\partial V}{\partial n}\,ds \;-\; \int_\Omega \varepsilon\,\nabla w\cdot\nabla V\,dA$$
+$$0 = \oint_{\partial\Omega} w\\,\varepsilon\\,\frac{\partial V}{\partial n}\\,ds \;-\; \int_\Omega \varepsilon\\,\nabla w\cdot\nabla V\\,dA$$
 
 Restricting $w$ to functions that vanish on the Dirichlet (conductor) boundaries
 eliminates that part of the boundary integral. No flux condition is imposed on the
@@ -186,7 +188,7 @@ remaining outer domain boundary — this is the weak form's *natural* boundary
 condition, corresponding physically to zero prescribed normal component of $\mathbf{D}$ there.
 What remains is the weak form the solver assembles:
 
-$$\int_\Omega \varepsilon\,\nabla w\cdot\nabla V\,dA = 0 \qquad \text{for every admissible } w$$
+$$\int_\Omega \varepsilon\\,\nabla w\cdot\nabla V\\,dA = 0 \qquad \text{for every admissible } w$$
 
 This formulation only ever requires *first* derivatives of $V$, unlike the original
 PDE which requires second derivatives — the reason piecewise-*linear* elements
@@ -197,13 +199,13 @@ PDE which requires second derivatives — the reason piecewise-*linear* elements
 Approximate $V$ as a linear combination of a finite set of basis (nodal shape)
 functions $N_j$:
 
-$$V(x,y) \approx \sum_j V_j\,N_j(x,y)$$
+$$V(x,y) \approx \sum_j V_j\\,N_j(x,y)$$
 
 The Galerkin method chooses the test functions from the *same* basis, $w = N_i$.
 Substituting into the weak form for every $i$ turns the continuous PDE into a
 finite linear system:
 
-$$\sum_j K_{ij}\,V_j = 0, \qquad K_{ij} = \int_\Omega \varepsilon\,\nabla N_i\cdot\nabla N_j\,dA$$
+$$\sum_j K_{ij}\\,V_j = 0, \qquad K_{ij} = \int_\Omega \varepsilon\\,\nabla N_i\cdot\nabla N_j\\,dA$$
 
 $K$ is the **global stiffness matrix** — symmetric, sparse (since $N_i$ and $N_j$
 overlap only for nodes sharing an element), and singular before boundary
@@ -229,7 +231,7 @@ $$N_i(x,y) = \frac{a_i + b_i x + c_i y}{2A_{\text{signed}}}$$
 with gradients that are **constant over the element** (a direct consequence of
 $N_i$ being linear):
 
-$$\nabla N_i = \frac{1}{2A_{\text{signed}}}\,(b_i,\,c_i)$$
+$$\nabla N_i = \frac{1}{2A_{\text{signed}}}\\,(b_i,\\,c_i)$$
 
 Using the *signed* area here is what makes this formula correct regardless of
 whether a triangle's vertices happen to be listed clockwise or counterclockwise:
@@ -245,7 +247,7 @@ Because $\nabla N_i$ is constant per element, the local integral is just the
 integrand times the element's area — but here the *unsigned* (physical) area
 $|A|$ is needed, since this is a genuine area integral, not a gradient:
 
-$$K^e_{ij} = \varepsilon_e \int_{\Omega_e} \nabla N_i\cdot\nabla N_j\,dA = \varepsilon_e\,\frac{b_i b_j + c_i c_j}{4\,|A|}$$
+$$K^e_{ij} = \varepsilon_e \int_{\Omega_e} \nabla N_i\cdot\nabla N_j\\,dA = \varepsilon_e\\,\frac{b_i b_j + c_i c_j}{4\\,|A|}$$
 
 Assembly sums each element's $3\times 3$ local matrix into the global $K$ at the
 corresponding global node indices — standard finite-element scatter-add,
@@ -262,7 +264,7 @@ Only the free-node block equations are meaningful constraints on the unknowns
 (the fixed-node rows aren't equations to solve, since $V_d$ is already known), so
 the system actually solved is the reduced one:
 
-$$K_{ff}\,V_f = -K_{fd}\,V_d$$
+$$K_{ff}\\,V_f = -K_{fd}\\,V_d$$
 
 which is exactly what `apply_conductors_and_solve` builds and hands to
 `scipy.sparse.linalg.spsolve`.
@@ -273,9 +275,9 @@ Since $V$ is piecewise linear, $\mathbf{E}=-\nabla V$ is exactly piecewise
 **constant** per element — not an approximation layered on top of the P1
 solution, but a direct property of it:
 
-$$\mathbf{E}_e = -\frac{1}{2A_{\text{signed}}}\sum_{i=1}^{3} V_i\,(b_i, c_i), \qquad \mathbf{D}_e = \varepsilon_e\,\mathbf{E}_e$$
+$$\mathbf{E}_e = -\frac{1}{2A_{\text{signed}}}\sum_{i=1}^{3} V_i\\,(b_i, c_i), \qquad \mathbf{D}_e = \varepsilon_e\\,\mathbf{E}_e$$
 
-$$w_e = \frac{1}{2}\,\mathbf{E}_e\cdot\mathbf{D}_e \quad \text{(J/m}^3\text{, per element)}, \qquad W = \sum_e w_e\,|A_e| \quad \text{(J/m)}$$
+$$w_e = \frac{1}{2}\\,\mathbf{E}_e\cdot\mathbf{D}_e \quad \text{(J/m}^3\text{, per element)}, \qquad W = \sum_e w_e\\,|A_e| \quad \text{(J/m)}$$
 
 $W$ comes out in **joules per meter of depth**, not joules — this is a 2D solve,
 implicitly representing a geometry that extrudes uniformly into the page. All
@@ -287,7 +289,7 @@ multiply by an actual depth to get total farads.
 For a two-conductor system carrying charge $+Q$ and $-Q$ at potentials $V_1,V_2$,
 electrostatic energy and capacitance are related by
 
-$$W = \frac{1}{2}Q\,\Delta V = \frac{1}{2}C(\Delta V)^2 \qquad\Longrightarrow\qquad C = \frac{2W}{(\Delta V)^2}$$
+$$W = \frac{1}{2}Q\\,\Delta V = \frac{1}{2}C(\Delta V)^2 \qquad\Longrightarrow\qquad C = \frac{2W}{(\Delta V)^2}$$
 
 This is preferred over integrating $\mathbf{D}\cdot\mathbf{n}$ along a conductor's
 boundary to recover $Q$ directly: the energy method only needs the volume integral
@@ -388,8 +390,8 @@ positive definite — peak RSS was measured and fitted to a power law in node co
 Fitting a power law to these four points gives peak RSS $\approx 0.14 \times
 \text{nodes}^{0.68}$ MB — extrapolating (not measured directly, to avoid risking
 an out-of-memory crash while writing this) puts roughly 2 million nodes ($h
-\approx 30\,\mu\text{m}$ on the coax domain) at about 2 GB, and roughly 11.5
-million nodes ($h = 10\,\mu\text{m}$) at close to 9 GB. Both shipped examples,
+\approx 30\\,\mu\text{m}$ on the coax domain) at about 2 GB, and roughly 11.5
+million nodes ($h = 10\\,\mu\text{m}$) at close to 9 GB. Both shipped examples,
 at their production resolution, sit at roughly 0.5 GB or less — comfortably
 below where this becomes a practical concern — but pushing `mesh_spacing` an
 order of magnitude finer than the shipped defaults (e.g. from $10^{-4}$ to
@@ -527,7 +529,7 @@ rectangle's center and $e_x = \text{width}/2-r$, $e_y = \text{height}/2-r$:
 
 $$q_x = |x-c_x|-e_x, \qquad q_y = |y-c_y|-e_y$$
 
-$$d = \sqrt{\max(q_x,0)^2+\max(q_y,0)^2} \;+\; \min(\max(q_x,q_y),\,0) \;-\; r$$
+$$d = \sqrt{\max(q_x,0)^2+\max(q_y,0)^2} \;+\; \min(\max(q_x,q_y),\\,0) \;-\; r$$
 
 a point is inside iff $d \le$ `BOUNDARY_TOLERANCE_M`. Straight sides reduce to
 the ordinary rectangle test; near a corner it falls back to "distance to the
