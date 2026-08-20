@@ -1,6 +1,6 @@
 # capacitor-fem
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21974301.svg)](https://doi.org/10.5281/zenodo.21974301)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22035778.svg)](https://doi.org/10.5281/zenodo.22035778)
 
 A self-contained 2D finite-element electrostatics solver for real capacitor geometries — parallel plates, coaxial cables, and arbitrary shapes built from simple primitives — rather than closed-form formulas that exist only for a few idealized cases.
 
